@@ -1,69 +1,63 @@
-use crate::datatype::NFTMetadata;
-use soroban_sdk::{contract, contractimpl};
-use soroban_sdk::{Address, Env, String, Symbol, symbol_short, Vec};
+use crate::metadata::NFTMetadata;
+use soroban_sdk::{Address, contract, contractimpl, Env, String, Symbol, symbol_short, Vec};
 
-const ADMIN_KEY: Symbol = symbol_short!("ADMIN");
-const TOKEN_COUNTER: Symbol = symbol_short!("COUNTER");
+pub trait RecognitionBadgeMintBurn {
+
+}
 
 #[contract]
-pub struct NFTContract;
+pub struct RecognitionBadge;
 
 #[contractimpl]
-impl NFTContract {
-    pub fn initialize(env: Env, admin: Address) {
-        if env.storage().instance().has(&ADMIN_KEY) {
-            panic!("Already initialized");
-        }
-        env.storage().instance().set(&ADMIN_KEY, &admin);
-        env.storage().instance().set(&TOKEN_COUNTER, &0u32);
-    }
-
-    fn check_admin(env: &Env, caller: &Address) {
-        let admin: Address = env.storage().instance().get(&ADMIN_KEY).unwrap();
-        if caller != &admin {
-            panic!("Unauthorized");
-        }
-    }
-
-    pub fn mint_nft(
+impl RecognitionBadge {
+    pub fn mint_recognition_badge(
         env: Env,
         to: Address,
         ev_title: String,
         ev_date: String,
-        ev_org: String,
+        ev_org: String, 
         ev_task: String,
     ) -> u32 {
         to.require_auth();
-
-        let mut current_id: u32 = env.storage().instance().get(&TOKEN_COUNTER).unwrap();
+        let mut current_id: u32 = env.storage().instance().get(&DataKey::TokenCounter).unwrap();
         current_id += 1;
-        env.storage().instance().set(&TOKEN_COUNTER, &current_id);
+        env.storage().instance().set(&DataKey::TokenCounter, &current_id);
 
         let metadata = NFTMetadata {
+            owner: to.clone(),
             ev_title,
             ev_date,
             ev_org,
-            ev_task
+            ev_task,
         };
+        env.storage().persistent().set(&current_id, &metadata);
 
-        env.storage().persistent().set(&current_id, &nft);
+        let mut badges = env
+            .storage()
+            .instance()
+            .get(&DataKey::Badges(to.clone()))
+            .unwrap_or_else(|| Vec::new(&env));
+        badges.push_back(current_id);
+        env.storage()
+            .instance()
+            .set(&DataKey::Badges(to.clone()), &badges);
 
         current_id
     }
 
     pub fn burn_nft(env: Env, owner: Address, token_id: u32) {
         owner.require_auth();
-
-        let nft: NFTMetadata = env
-            .storage()
-            .persistent()
-            .get(&token_id)
-            .expect("NFT not exist");
-
+        let nft: NFTMetadata = env.storage().persistent().get(&token_id).expect("NFT not exist");
         if nft.owner != owner {
             panic!("Unauthorized sender");
         }
-
         env.storage().persistent().remove(&token_id);
+    }
+
+    pub fn get_volunteer_nfts(env: Env, volunteer: Address) -> Vec<u32> {
+        env.storage()
+            .instance()
+            .get(&crate::datatype::DataKey::Badges(volunteer))
+            .unwrap_or_else(|| Vec::new(&env))
     }
 }
