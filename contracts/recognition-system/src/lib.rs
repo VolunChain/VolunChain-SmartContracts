@@ -1,7 +1,7 @@
 #![no_std]
+use crate::reputation_system;
 use soroban_sdk::{
-    contract, contractimpl, contracttype, 
-    Address, Env, Map, Symbol, symbol_short, Vec,
+    contract, contractimpl, contracttype, symbol_short, Address, Env, Map, String, Symbol, Vec,
 };
 
 mod event;
@@ -31,26 +31,29 @@ impl RecognitionSystem {
     // Initialize the contract
     pub fn initialize(env: Env, admin: Address) {
         admin.require_auth();
-        
+
         // Initialize authorized events list
         let events: Vec<Address> = Vec::new(&env);
         env.storage().instance().set(&DataKey::Events, &events);
     }
-    
-    pub fn mint_nft_with_event(env: Env, volunteer: Address, event_id: u64, task: String) {
-        let event = env
-            .storage()
-            .persistent()
-            .get(&event_id)
-            .expect("Event does not exist");
 
-        crate::token::ReputationBadge::mint_nft(
-            env,
-            volunteer,
-            event.title,
-            event.date,
-            event.organization,
-            task,
-        );
+    pub fn verify_confirmed_volunteer(env: Env, volunteer: Address, org: Address) -> bool {
+        // Check org is authorized
+        let organizations = reputation_system::ReputationSystem::get_organizations(&env);
+        if !organizations.contains(&org) {
+            return false;
+        }
+
+        // Check volunteer endorsements from the org
+        if let Some(endorsements) = env
+            .storage()
+            .instance()
+            .get(&reputation_system::DataKey::Endorsements(volunteer.clone()))
+        {
+            let endorsements: soroban_sdk::Map<Address, u32> = endorsements;
+            endorsements.contains_key(org)
+        } else {
+            false
+        }
     }
 }

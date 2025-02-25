@@ -1,4 +1,4 @@
-use crate::datatype::{Event};
+use crate::event::Event;
 use soroban_sdk::{Address, Env, String, Vec};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -12,41 +12,45 @@ pub struct NFTMetadata {
 }
 
 impl NFTMetadata {
-    pub fn new(env: &Env, event_id: u64, task: String) -> Self{
-        // TODO: Confirm event;
-
-        let event: Event = env.storage().persistent().get(&event_id).expect("Event ID invalid");
+    pub fn new(env: &Env, event_id: u64, owner: Address, task: String) -> Self {
+        let event: Event = env
+            .storage()
+            .persistent()
+            .get(&event_id)
+            .expect("Event ID invalid");
 
         Self {
-            owner: ,
-            ev_title: event.title,
-            ev_date: event.date,
-            ev_org: event.organization,
+            owner,
+            ev_title: event.title.clone(),
+            ev_date: event.date.clone(),
+            ev_org: event.organization.clone(),
             ev_task: task,
         }
     }
 
-    pub fn update_metadata(
-        env: Env,
-        admin: Address,
-        token_id: u32,
-        ev_title: String,
-        ev_date: String,
-        ev_org: String,
-        ev_task: String,
-    ) {
-        Self::check_admin(&env, &admin);
+    pub fn update_metadata(env: Env, admin: Address, event_id: u64, token_id: u32) {
+        // Check that admin is authorized
+        admin.require_auth();
 
+        // Confirm event exists
+        let event: Event = env
+            .storage()
+            .persistent()
+            .get(&event_id)
+            .expect("Event not found");
+
+        // Get the existing NFT
         let mut nft: NFTMetadata = env
             .storage()
             .persistent()
             .get(&token_id)
             .expect("NFT ID Invalid");
 
-        nft.ev_title = ev_title;
-        nft.ev_date = ev_date;
-        nft.ev_org = ev_org;
-        nft.ev_task = ev_task;
+        // Assign updated event fields
+        nft.ev_title = event.title.clone();
+        nft.ev_date = event.date.clone();
+        nft.ev_org = event.organization.clone();
+        nft.ev_task = nft.ev_task;
 
         env.storage().persistent().set(&token_id, &nft);
     }
