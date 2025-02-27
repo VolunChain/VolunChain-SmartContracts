@@ -1,5 +1,5 @@
 [package]
-name = "volunchain"
+name = "budget-allocation"
 version = "0.0.0"
 edition = "2021"
 publish = false
@@ -10,8 +10,6 @@ doctest = false
 
 [dependencies]
 soroban-sdk = { workspace = true }
-soroban-token-sdk = { workspace = true }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
-soroban-token-sdk = { workspace = true }
