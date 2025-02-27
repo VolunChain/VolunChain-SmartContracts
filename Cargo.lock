@@ -1248,6 +1248,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "soroban-token-sdk"
+version = "22.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "067f2b03706ba452d152ca73efba795e595c0f6bd4360eeaa3a6a356fb97d4c6"
+dependencies = [
+ "soroban-sdk",
+]
+
+[[package]]
 name = "soroban-wasmi"
 version = "0.31.1-soroban.20.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1417,6 +1426,7 @@ name = "volunchain"
 version = "0.0.0"
 dependencies = [
  "soroban-sdk",
+ "soroban-token-sdk",
 ]
 
 [[package]]
