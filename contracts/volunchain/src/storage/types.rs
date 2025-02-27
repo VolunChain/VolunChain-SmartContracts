@@ -16,11 +16,20 @@ pub struct Bounty {
 }
 
 #[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum Difficulty {
+    Low,
+    Medium,
+    Hard,
+}
+
+#[contracttype]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Task {
     pub description: String,
     pub status: String,
     pub completed: bool,
+    pub difficulty: Difficulty
 }
 
 #[contracttype]
