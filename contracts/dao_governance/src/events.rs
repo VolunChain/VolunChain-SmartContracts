@@ -27,3 +27,12 @@ pub fn emit_proposal_finalized(env: &Env, proposal_id: u32, approved: bool) {
 pub fn emit_config_updated(env: &Env) {
     env.events().publish((PROPOSAL_EXECUTED,), ()); // No additional data)
 }
+
+// Event for contract initialization
+pub fn emit_contract_initialized(env: &Env) {
+    env.events().publish((symbol_short!("INIT"),), ());
+}
+
+pub fn emit_proposal_executed(env: &Env, proposal_id: u32) {
+    env.events().publish(("proposal_executed", proposal_id), ());
+}
