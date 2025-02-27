@@ -2,7 +2,7 @@
 
 extern crate std;
 
-use crate::storage::types::{Bounty, Task};
+use crate::storage::types::{Bounty, Difficulty, Task};
 use crate::token::token::{Token, TokenClient};
 use crate::{contract::VolunchainContract, VolunchainContractClient};
 use soroban_sdk::{testutils::Address as _, vec, Address, Env, IntoVal, String};
@@ -30,11 +30,13 @@ fn test_create_bounty() {
             description: String::from_str(&env, "First task"),
             status: String::from_str(&env, "Delivered"),
             completed: true,
+            difficulty: Difficulty::Low
         },
         Task {
             description: String::from_str(&env, "Second task"),
             status: String::from_str(&env, "Delivered"),
             completed: true,
+            difficulty: Difficulty::Hard
         },
     ];
 
@@ -79,11 +81,13 @@ fn test_withdraw_the_reward() {
             description: String::from_str(&env, "First task"),
             status: String::from_str(&env, "Delivered"),
             completed: true,
+            difficulty: Difficulty::Low
         },
         Task {
             description: String::from_str(&env, "Second task"),
             status: String::from_str(&env, "Delivered"),
             completed: true,
+            difficulty: Difficulty::Low
         },
     ];
 
