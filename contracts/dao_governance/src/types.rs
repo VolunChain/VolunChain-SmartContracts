@@ -30,6 +30,9 @@ pub enum DaoError {
     ExecutionFailed = 7,
     ProposalAlreadyExecuted = 8,
     InsufficientVotingPower = 9,
+    AlreadyInitialized = 10,
+    ProposalNotPassed = 11,
+    ExecutionDelayNotMet = 12,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -66,9 +69,9 @@ pub struct Proposal {
     pub status: ProposalStatus,
     pub upvotes: u64,
     pub downvotes: u64,
-    pub execution_payload: Option<Vec<u32>>, // Changed to Vec<u8>
     pub minimum_quorum: u64,
     pub minimum_approval: u64,
+    pub executed: bool,
 }
 
 #[derive(Clone, Debug)]

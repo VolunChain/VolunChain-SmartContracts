@@ -339,6 +339,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "dao_governance"
+version = "0.1.0"
+dependencies = [
+ "soroban-sdk",
+]
+
+[[package]]
 name = "darling"
 version = "0.20.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
