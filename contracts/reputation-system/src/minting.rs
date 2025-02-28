@@ -1,11 +1,4 @@
-use soroban_sdk::{
-    Address, 
-    Env, 
-    Symbol, 
-    Vec, 
-    String,
-    symbol_short,
-};
+use soroban_sdk::{symbol_short, Address, Env, String, Symbol, Vec};
 
 #[allow(dead_code)]
 pub trait BadgeMinting {
@@ -14,7 +7,7 @@ pub trait BadgeMinting {
         recipient: &Address,
         badge_type: Symbol,
     ) -> Result<(), String>;
-    
+
     fn get_badge_multiplier(badge_type: &Symbol) -> u32;
 }
 
@@ -27,12 +20,16 @@ impl BadgeMinting for StandardBadgeMinting {
         recipient: &Address,
         badge_type: Symbol,
     ) -> Result<(), String> {
-        let mut badges = env.storage().instance()
+        let mut badges = env
+            .storage()
+            .instance()
             .get(&crate::DataKey::Badges(recipient.clone()))
             .unwrap_or_else(|| Vec::new(env));
-            
+
         badges.push_back(badge_type);
-        env.storage().instance().set(&crate::DataKey::Badges(recipient.clone()), &badges);
+        env.storage()
+            .instance()
+            .set(&crate::DataKey::Badges(recipient.clone()), &badges);
         Ok(())
     }
 
@@ -44,4 +41,4 @@ impl BadgeMinting for StandardBadgeMinting {
             _ => 5,
         }
     }
-} 
+}

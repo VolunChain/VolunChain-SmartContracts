@@ -1,4 +1,4 @@
-use soroban_sdk::{Env, Symbol, String, Vec};
+use soroban_sdk::{Env, String, Symbol, Vec};
 
 #[allow(dead_code)]
 #[derive(Clone)]
@@ -19,11 +19,14 @@ impl ReputationMetadata {
     }
 
     pub fn calculate_level(&mut self, env: &Env, reputation: u32) {
-        self.level = String::from_str(env, match reputation {
-            0..=99 => "Beginner",
-            100..=499 => "Intermediate",
-            500..=999 => "Advanced",
-            _ => "Expert",
-        });
+        self.level = String::from_str(
+            env,
+            match reputation {
+                0..=99 => "Beginner",
+                100..=499 => "Intermediate",
+                500..=999 => "Advanced",
+                _ => "Expert",
+            },
+        );
     }
-} 
+}

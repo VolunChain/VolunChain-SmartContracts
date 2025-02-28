@@ -16,4 +16,4 @@ impl ReputationDistribution for StandardDistribution {
     fn check_bounty_access(&self, reputation: u32, min_required: u32) -> bool {
         reputation >= min_required
     }
-} 
+}
