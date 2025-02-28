@@ -1,11 +1,10 @@
 use crate::{
-    datatype::{DataKeys, NFTMetadata, RecognitionNFT, NFTError},
+    datatype::{DataKeys, NFTError, RecognitionNFT},
     interfaces::{MetadataOperations, MintingOperations},
-    RecognitionSystemContract, RecognitionSystemContractArgs, RecognitionSystemContractClient,
+    RecognitionSystemContract,
 };
 use soroban_sdk::{
-    contract, contractimpl, contracttype, symbol_short, Address, Env, String, Symbol, TryFromVal,
-    U256, Vec,
+    Address, Env, String, Symbol, Vec,
 };
 
 impl MintingOperations for RecognitionSystemContract {
@@ -16,39 +15,76 @@ impl MintingOperations for RecognitionSystemContract {
         title: String,
         date: String,
         task: String,
-    ) -> Result<U256, NFTError> {
+    ) -> Result<u128, NFTError> {
+        // Require auth from recipient
         recipient.require_auth();
+        
+        // Validate inputs
+        if title.len() == 0 {
+            return Err(NFTError::MetadataInvalid);
+        }
+        
+        if date.len() == 0 {
+            return Err(NFTError::MetadataInvalid);
+        }
+        
+        if task.len() == 0 {
+            return Err(NFTError::MetadataInvalid);
+        }
 
-        let mut current_id: U256 = env
+        // Check if organization is authorized
+        if !Self::verify_authorized_organization(env, organization.clone()) {
+            return Err(NFTError::OrganizationNotAuthorized);
+        }
+        
+        // Get or initialize token counter
+        let mut current_id: u128 = env
             .storage()
             .instance()
             .get(&DataKeys::TokenCounter)
-            .unwrap_or(U256::from(&env, 0));
-        current_id = current_id + 1;
+            .unwrap_or(0_u128);
+        current_id += 1;
         env.storage()
             .instance()
             .set(&DataKeys::TokenCounter, &current_id);
 
-        let metadata = MetadataOperations::new(env, organization, title, date, task)?;
+        // Create metadata and NFT
+        let metadata = Self::create_nft_metadata(organization, title, date, task)?;
         let nft = RecognitionNFT {
             owner: recipient.clone(),
             metadata,
         };
 
-        let token_id = current_id;
-        env.storage().persistent().set(&token_id, &nft);
+        // Store NFT by token ID
+        env.storage().persistent().set(&current_id, &nft);
 
-        let mut volunteer_tokens: Vec<U256> = env
+        // Update volunteer's badge list
+        let mut volunteer_tokens: Vec<u128> = env
             .storage()
             .persistent()
             .get(&DataKeys::VolunteerRecognition(recipient.clone()))
             .unwrap_or_else(|| Vec::new(env));
-        volunteer_tokens.push_back(token_id);
+        volunteer_tokens.push_back(current_id);
         env.storage().persistent().set(
             &DataKeys::VolunteerRecognition(recipient.clone()),
             &volunteer_tokens,
         );
 
-        Ok(token_id)
+        // Emit event
+        env.events().publish(
+            (Symbol::new(env, "badge_minted"), recipient.clone()),
+            current_id,
+        );
+
+        Ok(current_id)
+    }
+    
+    // Helper function to verify if an organization is authorized
+    fn verify_authorized_organization(env: &Env, org: Address) -> bool {
+        // Check if this organization exists in the reputation system
+        match env.storage().instance().get::<_, Vec<Address>>(&reputation_system::DataKey::Organizations) {
+            Some(organizations) => organizations.contains(&org),
+            None => false
+        }
     }
 }
