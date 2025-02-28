@@ -1,14 +1,13 @@
 use crate::{
     datatype::{NFTError, NFTMetadata, RecognitionNFT},
     interfaces::MetadataOperations,
-    RecognitionSystemContract, RecognitionSystemContractArgs, RecognitionSystemContractClient,
+    RecognitionSystemContract,
 };
-use soroban_sdk::{Address, Env, String, U256, Vec};
+use soroban_sdk::{Address, Env, String};
 
 #[allow(dead_code)]
 impl MetadataOperations for RecognitionSystemContract {
-    fn new(
-        env: &Env,
+    fn create_nft_metadata(
         organization: Address,
         title: String,
         date: String,
@@ -26,7 +25,7 @@ impl MetadataOperations for RecognitionSystemContract {
     fn update_metadata(
         env: &Env,
         admin: Address,
-        token_id: U256,
+        token_id: u128,
         organization: Address,
         title: String,
         date: String,
@@ -51,7 +50,7 @@ impl MetadataOperations for RecognitionSystemContract {
         env
             .storage()
             .persistent()
-            .set(&token_id, nft);
+            .set(&token_id, &nft);
         Ok(())
     }
 }

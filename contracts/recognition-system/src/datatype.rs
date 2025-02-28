@@ -1,30 +1,34 @@
-use soroban_sdk::{contracterror, contracttype, Address, String, Vec};
+use soroban_sdk::{contracterror, contracttype, Address, String};
 
+/// @notice Storage keys for the contract
 #[contracttype]
 #[derive(Clone)]
 pub enum DataKeys {
-    Admin,
-    RecognitionBadge(Address),
-    TokenCounter,
-    VolunteerRecognition(Address),
+    Admin, // Contract admin address
+    RecognitionBadge(Address), // Recognition badges for a specific volunteer
+    TokenCounter, // Global counter for token IDs
+    VolunteerRecognition(Address), // List of badge IDs owned by a volunteer
 }
 
+/// @notice Structure representing a soulbound NFT badge
+#[contracttype]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RecognitionNFT {
-    pub owner: Address,
-    pub metadata: NFTMetadata,
+    pub owner: Address, // Address of the badge owner (volunteer)
+    pub metadata: NFTMetadata, // Badge metadata containing event/contribution details
 }
 
-// Data Structure representing NFT Metadata
+/// @notice Metadata structure for recognition badges
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct NFTMetadata {
-    pub ev_org: Address,
-    pub ev_title: String,
-    pub ev_date: String,
-    pub task: String,
+    pub ev_org: Address, // Organization that endorsed this contribution
+    pub ev_title: String, // Title of the event or contribution
+    pub ev_date: String, // Date of the event or contribution
+    pub task: String, // Specific task performed by the volunteer
 }
 
+/// @notice Admin-related error codes
 #[contracterror]
 #[derive(Debug, Clone, PartialEq)]
 pub enum AdminError {
@@ -32,9 +36,18 @@ pub enum AdminError {
     UnauthorizedSender = 2,
 }
 
+/// @notice NFT-related error codes
 #[contracterror]
 #[derive(Debug, Clone, PartialEq)]
 pub enum NFTError {
     IDExists = 1,
     IDInvalid = 2,
+    UnauthorizedOwner = 3,
+    BadgeNotFound = 4,
+    VolunteerNotEndorsed = 5,
+    OrganizationNotAuthorized = 6,
+    MetadataInvalid = 7,
+    EventNotFound = 8,
+    TokenCannotBeTransferred = 9,
+    OperationNotPermitted = 10,
 }
