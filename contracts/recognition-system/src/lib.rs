@@ -1,54 +1,90 @@
 #![no_std]
-use reputation_system;
+use datatype::{AdminError, DataKeys, NFTError, NFTMetadata, RecognitionNFT};
 use soroban_sdk::{
-    contract, contractimpl, contracttype, symbol_short,
-    Address, Env, Map, String, Symbol, Vec,
+    contract, contractimpl, contracttype, symbol_short, Address, Env, Map, String, Symbol, Vec,
+    U256,
 };
 
+// use reputation_system;
+
+mod datatype;
 mod distribution;
+mod interfaces;
 mod metadata;
 mod minting;
 
 #[cfg(test)]
 mod test;
 
-const ADMIN_KEY: Symbol = symbol_short!("ADMIN");
-
-#[derive(Clone)]
-#[contracttype]
-pub enum DataKey {
-    RecognitionBadges(Address),
-    Recognition(Address),
-    TokenCounter,
-}
-
 #[contract]
-pub struct RecognitionSystem;
+pub struct RecognitionSystemContract;
 
 #[contractimpl]
-impl RecognitionSystem {
+impl RecognitionSystemContract {
     // Initialize the contract
-    pub fn initialize(env: Env, admin: Address) {
-        admin.require_auth();
-
-        // TODO: Initialize token counter in Datakey
-    }
-
-    pub fn verify_confirmed_volunteer(env: &Env, volunteer: Address, org: Address) -> bool {
-        // Check org is authorized
-        let organizations = reputation_system::ReputationSystem::get_organizations(env.clone());
-        if !organizations.contains(&org) {
-            return false;
+    pub fn initialize(env: Env, admin: Address) -> Result<(), AdminError> {
+        if env.storage().instance().has(&DataKeys::Admin) {
+            return Err(AdminError::AlreadyInitialized);
         }
 
-         // Check volunteer endorsements from the org
-        let endorsement_key = &reputation_system::DataKey::Endorsements(volunteer.clone());
-        let endorsements: Map<Address, u32> = env
-            .storage()
+        admin.require_auth();
+        env.storage().instance().set(&DataKeys::Admin, &admin);
+        env.storage().instance().set(&DataKeys::TokenCounter, &0);
+
+        env.events().publish(
+            (Symbol::new(&env, "Contract Initialized"), admin.clone()),
+            env.ledger().timestamp(),
+        );
+
+        Ok(())
+    }
+
+    pub fn get_admin(env: Env) -> Result<Address, AdminError> {
+        env.storage()
             .instance()
-            .get(endorsement_key)
-            .unwrap_or_else(|| Map::new(&env));
-        
-        endorsements.contains_key(org)
+            .get(&DataKeys::Admin)
+            .ok_or(AdminError::UnauthorizedSender)
+    }
+
+    pub fn get_volunteer_badge(env: Env, token_id: U256) -> Result<RecognitionNFT, NFTError> {
+        if let Some(nft) = env
+            .storage()
+            .persistent()
+            .get(&token_id) {
+            Ok(nft)
+        } else {
+            Err(NFTError::IDInvalid)
+        }
+    }
+
+    pub fn get_volunteer_badges(
+        env: Env,
+        volunteer: Address,
+    ) -> Result<Vec<RecognitionNFT>, NFTError> {
+        let badges_key = DataKeys::VolunteerRecognition(volunteer.clone());
+        let token_ids: Vec<U256> = env
+            .storage()
+            .persistent()
+            .get(&badges_key)
+            .unwrap_or_else(|| Vec::new(&env));
+
+        let mut nfts = Vec::new(&env);
+        for id in token_ids.iter() {
+            if let Some(nft) = env.storage().persistent().get(&id) {
+                nfts.push_back(nft);
+            }
+        }
+
+        Ok(nfts)
+    }
+
+    pub fn get_metadata(env: &Env, token_id: U256) -> Result<NFTMetadata, NFTError> {
+        let nft: RecognitionNFT = env
+            .storage()
+            .persistent()
+            .get(&token_id)
+            .expect("NFT not found");
+
+        Ok(nft.metadata)
     }
 }

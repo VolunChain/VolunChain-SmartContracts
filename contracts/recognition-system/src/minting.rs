@@ -1,60 +1,54 @@
-use crate::DataKey;
-use crate::metadata::NFTMetadata;
+use crate::{
+    datatype::{DataKeys, NFTMetadata, RecognitionNFT, NFTError},
+    interfaces::{MetadataOperations, MintingOperations},
+    RecognitionSystemContract, RecognitionSystemContractArgs, RecognitionSystemContractClient,
+};
 use soroban_sdk::{
-    contract, contractimpl, contracttype, symbol_short,
-    Address, Env, String, Symbol, TryFromVal, Vec
+    contract, contractimpl, contracttype, symbol_short, Address, Env, String, Symbol, TryFromVal,
+    U256, Vec,
 };
 
-pub trait RecognitionBadgeMinting {
-    fn mint_recognition_badge(env: &Env, recipient: Address, organization: Address, title: String, date: String, task: String) -> u32;
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct RecognitionBadge {
-    pub owner: Address,
-    pub metadata: NFTMetadata,
-}
-
-#[allow(dead_code)]
-pub struct NFTMinting;
-
-impl RecognitionBadgeMinting for NFTMinting {
-    fn mint_recognition_badge(env: &Env, recipient: Address, organization: Address, title: String, date: String, task: String) -> u32 {
-        // Authenticate caller == token minter
+impl MintingOperations for RecognitionSystemContract {
+    fn mint_recognition_badge(
+        env: &Env,
+        recipient: Address,
+        organization: Address,
+        title: String,
+        date: String,
+        task: String,
+    ) -> Result<U256, NFTError> {
         recipient.require_auth();
 
-        // Get curernt token ID and increment token counter 
-        let mut current_id: u32 = env
+        let mut current_id: U256 = env
             .storage()
             .instance()
-            .get(&DataKey::TokenCounter)
-            .unwrap();
-        current_id += 1;
+            .get(&DataKeys::TokenCounter)
+            .unwrap_or(U256::from(&env, 0));
+        current_id = current_id + 1;
         env.storage()
             .instance()
-            .set(&DataKey::TokenCounter, &current_id);
+            .set(&DataKeys::TokenCounter, &current_id);
 
-        let metadata = NFTMetadata::new(&env, organization, title, date, task);
-        let nft = RecognitionBadge {
+        let metadata = MetadataOperations::new(env, organization, title, date, task)?;
+        let nft = RecognitionNFT {
             owner: recipient.clone(),
             metadata,
         };
 
-        // env.storage().persistent().set(&current_id, &nft);
+        let token_id = current_id;
+        env.storage().persistent().set(&token_id, &nft);
 
-        let mut badges: Vec<RecognitionBadge> = env
+        let mut volunteer_tokens: Vec<U256> = env
             .storage()
-            .instance()
-            .get(&DataKey::RecognitionBadges(recipient.clone()))
+            .persistent()
+            .get(&DataKeys::VolunteerRecognition(recipient.clone()))
             .unwrap_or_else(|| Vec::new(env));
+        volunteer_tokens.push_back(token_id);
+        env.storage().persistent().set(
+            &DataKeys::VolunteerRecognition(recipient.clone()),
+            &volunteer_tokens,
+        );
 
-        badges.push_back(nft);
-
-        env.storage()
-            .instance()
-            .set(&DataKey::RecognitionBadges(recipient.clone()), &badges);
-
-
-        current_id
+        Ok(token_id)
     }
 }
