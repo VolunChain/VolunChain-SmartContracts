@@ -5,3 +5,5 @@ Cargo.lock
 # Local settings
 .soroban
 .stellar
+
+.DS_Store

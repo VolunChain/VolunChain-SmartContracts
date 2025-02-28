@@ -1,5 +1,5 @@
 [package]
-name = "reputation-system"
+name = "recognition-system"
 version = "0.0.0"
 edition = "2021"
 publish = false
@@ -9,6 +9,8 @@ doctest = false
 
 [dependencies]
 soroban-sdk = { workspace = true }
+reputation-system = { path = "../reputation-system" }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
+
