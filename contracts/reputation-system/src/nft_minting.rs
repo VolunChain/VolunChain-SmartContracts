@@ -15,6 +15,15 @@ pub trait BadgeMinting {
 pub struct StandardBadgeMinting;
 
 impl BadgeMinting for StandardBadgeMinting {
+    /// Mints an achievement badge for a recipient.
+    ///
+    /// # Parameters
+    /// - `env`: The environment context.
+    /// - `recipient`: The address of the recipient.
+    /// - `badge_type`: The type of badge to mint.
+    ///
+    /// # Returns
+    /// Returns Ok(()) if the minting is successful or an error if it fails.
     fn mint_achievement_badge(
         env: &Env,
         recipient: &Address,
@@ -33,6 +42,13 @@ impl BadgeMinting for StandardBadgeMinting {
         Ok(())
     }
 
+    /// Gets the multiplier for a given badge type.
+    ///
+    /// # Parameters
+    /// - `badge_type`: The type of badge to get the multiplier for.
+    ///
+    /// # Returns
+    /// Returns the multiplier associated with the badge type.
     fn get_badge_multiplier(badge_type: &Symbol) -> u32 {
         match badge_type {
             s if s == &symbol_short!("GOLD") => 30,

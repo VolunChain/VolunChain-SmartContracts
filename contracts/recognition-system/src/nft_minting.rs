@@ -8,6 +8,18 @@ use soroban_sdk::{
 };
 
 impl MintingOperations for RecognitionSystemContract {
+    /// Mints a recognition badge for a recipient.
+    ///
+    /// # Parameters
+    /// - `env`: The environment context.
+    /// - `recipient`: The address of the recipient.
+    /// - `organization`: The address of the organization minting the badge.
+    /// - `title`: The title of the badge.
+    /// - `date`: The date the badge is minted.
+    /// - `task`: The task associated with the badge.
+    ///
+    /// # Returns
+    /// Returns the token ID of the minted badge or an error if the minting fails.
     fn mint_recognition_badge(
         env: &Env,
         recipient: Address,
@@ -80,6 +92,14 @@ impl MintingOperations for RecognitionSystemContract {
     }
     
     // Helper function to verify if an organization is authorized
+    /// Verifies if an organization is authorized to mint badges.
+    ///
+    /// # Parameters
+    /// - `env`: The environment context.
+    /// - `org`: The address of the organization to verify.
+    ///
+    /// # Returns
+    /// Returns true if the organization is authorized, false otherwise.
     fn verify_authorized_organization(env: &Env, org: Address) -> bool {
         // Check if this organization exists in the reputation system
         match env.storage().instance().get::<_, Vec<Address>>(&reputation_system::DataKey::Organizations) {
