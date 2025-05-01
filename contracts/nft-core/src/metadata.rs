@@ -1,4 +1,3 @@
-// In nft-core/src/metadata.rs
 use soroban_sdk::{Address, Env, String, contracttype};
 
 #[contracttype]

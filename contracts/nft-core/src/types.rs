@@ -1,4 +1,4 @@
-use soroban_sdk::{contracterror, contracttype, Address, String, Map};
+use soroban_sdk::{contracterror, contracttype, Address, String, Map, Vec};
 
 #[contracttype]
 pub enum DataKey {
@@ -7,6 +7,9 @@ pub enum DataKey {
     TokenCount,                 // Counter for token IDs
     Admin,                      // Admin address
     AuthorizedMinters,          // List of authorized minters
+    ContractVersion,            // Contract version for upgrades
+    URIBase,                    // Base URI for external metadata
+    Paused,                     // Contract pause status
 }
 
 #[contracttype]
@@ -29,6 +32,23 @@ pub struct NFTMetadata {
     pub attributes: Map<String, String>,
 }
 
+#[contracttype]
+#[derive(Clone, Debug)]
+pub struct NFTMintBatch {
+    pub recipients: Vec<Address>,
+    pub titles: Vec<String>,
+    pub descriptions: Vec<String>,
+    pub attributes: Vec<Vec<(String, String)>>,
+    pub transferable: Vec<bool>,
+}
+
+#[contracttype]
+#[derive(Clone, Debug)]
+pub struct ExternalURIMetadata {
+    pub base_uri: String,
+    pub token_uri_suffix: String,
+}
+
 #[contracterror]
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum NFTError {
@@ -40,4 +60,16 @@ pub enum NFTError {
     InvalidMetadata = 6,
     TokenNotTransferable = 7,
     ContractAlreadyInitialized = 8,
+    InvalidAddress = 9,
+    BatchDataMismatch = 10,
+    MetadataTooLarge = 11,
+    UpgradeNotAuthorized = 12,
+    ContractPaused = 13,
+    Unauthorized = 14,
+    InitializationError = 15,
+    InvalidInput = 16,
+    InvalidBatchData = 17,
+    InvalidRecipient = 18,
+    BatchTooLarge = 19,
+    ContractError = 20,
 }
