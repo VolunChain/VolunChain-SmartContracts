@@ -1,10 +1,11 @@
 #![cfg(test)]
 use soroban_sdk::{
+    symbol_short,
     testutils::{Address as _, Events},
-    vec, Address, Env, IntoVal, Symbol, Vec,
+    vec, Address, Env, IntoVal, Symbol,
 };
 
-use crate::{Error, GoalTrackerContract, GoalTrackerContractClient, GoalType};
+use crate::{ContractError, GoalTrackerContract, GoalTrackerContractClient, GoalType};
 
 #[test]
 fn test_goal_creation() {
@@ -46,7 +47,7 @@ fn test_goal_creation() {
     // Test creating goal with zero target (should fail)
     env.mock_all_auths();
     let result = client.try_create_goal(&volunteer, &GoalType::HoursVolunteered, &0);
-    assert_eq!(result, Err(Ok(Error::TargetMustBePositive)));
+    assert_eq!(result, Err(Ok(ContractError::TargetMustBePositive)));
 }
 
 #[test]
@@ -88,7 +89,7 @@ fn test_progress_updates() {
     // Zero amount (should fail)
     env.mock_all_auths();
     let result = client.try_update_progress(&goal_id, &0);
-    assert_eq!(result, Err(Ok(Error::AmountToAddMustBePositive)));
+    assert_eq!(result, Err(Ok(ContractError::AmountToAddMustBePositive)));
 
     // Update to completion
     env.mock_all_auths();
@@ -99,7 +100,7 @@ fn test_progress_updates() {
     // Try updating completed goal (should fail)
     env.mock_all_auths();
     let result = client.try_update_progress(&goal_id, &10);
-    assert_eq!(result, Err(Ok(Error::GoalAlreadyCompleted)));
+    assert_eq!(result, Err(Ok(ContractError::GoalAlreadyCompleted)));
 }
 
 #[test]
@@ -230,5 +231,239 @@ fn test_progress_update_events() {
                 (goal_id, 25u64, 25u64).into_val(&env)
             ),
         ]
+    );
+}
+
+#[test]
+fn test_edge_cases() {
+    let env = Env::default();
+    let contract_id = env.register_contract(None, GoalTrackerContract);
+    let client = GoalTrackerContractClient::new(&env, &contract_id);
+
+    // Initialize with proper auth
+    let admin = Address::generate(&env);
+    let updater = Address::generate(&env);
+    env.mock_all_auths();
+    client.initialize(&admin, &updater);
+
+    // Test fetching non-existent goal
+    let result = client.try_get_goal(&999);
+    assert_eq!(result, Err(Ok(ContractError::GoalNotFound)));
+
+    // Test getting goals for user with none
+    let user_with_no_goals = Address::generate(&env);
+    let goals = client.get_goals_by_user(&user_with_no_goals);
+    assert_eq!(goals.len(), 0);
+
+    // Test reinitialization (should fail)
+    env.mock_all_auths();
+    let result = client.try_initialize(&admin, &updater);
+    assert_eq!(result, Err(Ok(ContractError::AlreadyInitialized)));
+
+    // Test unauthorized set_updater
+    let non_admin = Address::generate(&env);
+    env.as_contract(&contract_id, || {
+        let result = client.try_set_updater(&non_admin);
+        assert!(result.is_err(), "Expected panic from unauthorized admin");
+    });
+
+    // Test unauthorized update_progress
+
+    env.as_contract(&contract_id, || {
+        let result = client.try_update_progress(&1, &10);
+        assert!(result.is_err(), "Expected panic from unauthorized updater");
+    });
+}
+
+#[test]
+fn test_reinitialization_attempt() {
+    let env = Env::default();
+    let contract_id = env.register_contract(None, GoalTrackerContract);
+    let client = GoalTrackerContractClient::new(&env, &contract_id);
+
+    // First initialization
+    let admin = Address::generate(&env);
+    let updater = Address::generate(&env);
+    env.mock_all_auths();
+    client.initialize(&admin, &updater);
+
+    let new_admin = Address::generate(&env);
+    let new_updater = Address::generate(&env);
+    env.mock_all_auths();
+    let result = client.try_initialize(&new_admin, &new_updater);
+
+    assert_eq!(result, Err(Ok(ContractError::AlreadyInitialized)));
+
+    assert_eq!(client.get_admin(), admin);
+    assert_eq!(client.get_updater(), updater);
+}
+#[test]
+fn test_unauthorized_access() {
+    let env = Env::default();
+    let contract_id = env.register_contract(None, GoalTrackerContract);
+    let client = GoalTrackerContractClient::new(&env, &contract_id);
+
+    // Initialize
+    let admin = Address::generate(&env);
+    let updater = Address::generate(&env);
+    env.mock_all_auths();
+    client.initialize(&admin, &updater);
+
+    // Create goal
+    let volunteer = Address::generate(&env);
+    env.mock_all_auths();
+    let goal_id = client.create_goal(&volunteer, &GoalType::HoursVolunteered, &100);
+
+    let attacker = Address::generate(&env);
+
+    //  Unauthorized set_updater attempt
+    env.as_contract(&contract_id, || {
+        let result = client.try_set_updater(&attacker);
+        assert!(result.is_err(), "Should_prevent_non-admin");
+    });
+
+    // Unauthorized set_admin attempt
+    env.as_contract(&contract_id, || {
+        let result = client.try_set_admin(&attacker);
+        assert!(
+            result.is_err(),
+            "Should_prevent_non-admin_from_setting_admin"
+        );
+    });
+
+    //  Unauthorized update_progress attempt
+    env.as_contract(&contract_id, || {
+        let result = client.try_update_progress(&goal_id, &10);
+        assert!(
+            result.is_err(),
+            "Should_prevent_non-updater_from_updating_progress"
+        );
+    });
+
+    // Unauthorized remove_updater attempt
+    env.as_contract(&contract_id, || {
+        let result = client.try_remove_updater();
+        assert!(
+            result.is_err(),
+            "Should prevent non-admin from removing updater"
+        );
+    });
+
+    assert_eq!(client.get_admin(), admin);
+    assert_eq!(client.get_updater(), updater);
+    assert_eq!(client.get_goal(&goal_id).current_amount, 0);
+}
+
+#[test]
+fn test_authorization_requirements() {
+    let env = Env::default();
+    let contract_id = env.register_contract(None, GoalTrackerContract);
+    let client = GoalTrackerContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let updater = Address::generate(&env);
+    let result = client.try_initialize(&admin, &updater);
+    assert!(result.is_err(), "Init_without_auth_should_fail");
+
+    env.mock_all_auths();
+    client.initialize(&admin, &updater);
+
+    let volunteer = Address::generate(&env);
+
+    let result = client
+        .try_create_goal(&volunteer, &GoalType::TasksCompleted, &5)
+        .unwrap();
+    assert_eq!(result, Ok(1), "Not_Create_goal");
+
+    env.as_contract(&contract_id, || {
+        let result = client.try_create_goal(&volunteer, &GoalType::TasksCompleted, &5);
+        assert!(result.is_err(), "Create_goal_with_wrong_auth_should_fail");
+    });
+
+    env.mock_all_auths();
+    let goal_id = client.create_goal(&volunteer, &GoalType::TasksCompleted, &5);
+
+    env.as_contract(&contract_id, || {
+        let result = client.try_update_progress(&goal_id, &1);
+        assert!(result.is_err(), "Update_with_non_updater_auth_should_fail");
+    });
+}
+
+#[test]
+fn test_get_functions() {
+    let env = Env::default();
+    let contract_id = env.register_contract(None, GoalTrackerContract);
+    let client = GoalTrackerContractClient::new(&env, &contract_id);
+
+    assert_eq!(
+        client.try_get_admin(),
+        Err(Ok(ContractError::NotInitialized)),
+        "get_admin_should_fail_when_not_initialized"
+    );
+    assert_eq!(
+        client.try_get_updater(),
+        Err(Ok(ContractError::NotInitialized)),
+        "get_updater_should_fail_when_not_initialized"
+    );
+    assert_eq!(
+        client.try_get_next_id(),
+        Err(Ok(ContractError::NotInitialized)),
+        "get_next_id_should_fail_when_not_initialized"
+    );
+
+    let admin = Address::generate(&env);
+    let updater = Address::generate(&env);
+    env.mock_all_auths();
+    client.initialize(&admin, &updater);
+
+    assert_eq!(
+        client.get_admin(),
+        admin,
+        "get_admin_should_return_correct_value"
+    );
+    assert_eq!(
+        client.get_updater(),
+        updater,
+        "get_updater_should_return_correct_value"
+    );
+    assert_eq!(
+        client.get_next_id(),
+        1,
+        "get_next_id_should_return_initial_value"
+    );
+
+    let volunteer = Address::generate(&env);
+    env.mock_all_auths();
+    let goal_id = client.create_goal(&volunteer, &GoalType::TasksCompleted, &10);
+
+    let goal = client.get_goal(&goal_id);
+    assert_eq!(goal.id, goal_id, "get_goal_should_return_correct_goal");
+    assert_eq!(
+        goal.volunteer, volunteer,
+        "get_goal_should_have_correct_volunteer"
+    );
+    assert_eq!(
+        client.try_get_goal(&999),
+        Err(Ok(ContractError::GoalNotFound)),
+        "get_goal_should_fail_for_invalid_id"
+    );
+
+    let user_goals = client.get_goals_by_user(&volunteer);
+    assert_eq!(
+        user_goals.len(),
+        1,
+        "get_goals_by_user_should_return_correct_count"
+    );
+    assert_eq!(
+        user_goals.get(0).unwrap(),
+        goal_id,
+        "get_goals_by_user_should_include_goal_id"
+    );
+
+    let new_user = Address::generate(&env);
+    let empty_goals = client.get_goals_by_user(&new_user);
+    assert!(
+        empty_goals.is_empty(),
+        "get_goals_by_user_should_return_empty_vec_for_new_user"
     );
 }
