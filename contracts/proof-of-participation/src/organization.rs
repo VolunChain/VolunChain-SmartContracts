@@ -1,8 +1,10 @@
-use soroban_sdk::{Address, Env, String};
+use soroban_sdk::{Address, Env, String, Vec};
 
 use crate::error::ContractError;
 use crate::events;
 use crate::storage;
+use crate::organization_storage;
+
 
 pub fn register_organization(
     env: &Env,
@@ -10,20 +12,17 @@ pub fn register_organization(
     organization: &Address,
     name: &String,
 ) -> Result<(), ContractError> {
-    // Verify admin authorization
     storage::check_admin(env, admin)?;
-    
-    if storage::is_organization_registered(env, organization) {
+
+    if organization_storage::is_organization_registered(env, organization) {
         return Err(ContractError::OrganizationAlreadyRegistered);
     }
-    
-    storage::store_organization(env, organization, name);
-    
+
+    organization_storage::store_organization(env, organization, name);
     events::organization_registered(env, organization, name);
-    
+
     Ok(())
 }
-
 
 pub fn remove_organization(
     env: &Env,
@@ -31,25 +30,31 @@ pub fn remove_organization(
     organization: &Address,
 ) -> Result<(), ContractError> {
     storage::check_admin(env, admin)?;
-    
-    if !storage::is_organization_registered(env, organization) {
+
+    if !organization_storage::is_organization_registered(env, organization) {
         return Err(ContractError::OrganizationNotRegistered);
     }
-    
-    storage::remove_organization_from_storage(env, organization);
-    
+
+
+    organization_storage::remove_organization_from_storage(env, organization);
+
     events::organization_removed(env, organization);
-    
+
     Ok(())
 }
 
 pub fn is_organization(env: &Env, organization: &Address) -> bool {
-    storage::is_organization_registered(env, organization)
+    organization_storage::is_organization_registered(env, organization)
 }
 
 pub fn verify_organization(env: &Env, organization: &Address) -> Result<(), ContractError> {
-    if !storage::is_organization_registered(env, organization) {
-        return Err(ContractError::OrganizationNotRegistered);
+    if !organization_storage::is_organization_registered(env, organization) {
+        Err(ContractError::OrganizationNotRegistered)
+    } else {
+        Ok(())
     }
-    Ok(())
+}
+
+pub fn get_all_organizations(env: &Env) -> Vec<Address> {
+    organization_storage::get_all_organizations(env)
 }

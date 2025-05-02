@@ -1,42 +1,38 @@
-use soroban_sdk::{Address, Env, String, Symbol, contracttype};
+use soroban_sdk::{Address, Env, String, Symbol};
 
-#[contracttype]
-pub enum ParticipationEventType {
-    OrganizationRegistered,
-    OrganizationRemoved,
-    ParticipationRegistered,
-}
+const ORG_REGISTERED_TOPIC: &str = "pop_org_registered_v1";
+const ORG_REMOVED_TOPIC: &str = "pop_org_removed_v1";
+const PART_REGISTERED_TOPIC: &str = "pop_part_registered_v1";
 
-// Emit an event when an organization is registered
+
 pub fn organization_registered(env: &Env, organization: &Address, name: &String) {
-    let topics = (Symbol::new(env, "organization_registered"), organization.clone());
+    let topics = (Symbol::new(env, ORG_REGISTERED_TOPIC), organization.clone()); 
     env.events().publish(topics, name.clone());
 }
 
-// Emit an event when an organization is removed
+
 pub fn organization_removed(env: &Env, organization: &Address) {
-    let topics = (Symbol::new(env, "organization_removed"), organization.clone());
+    let topics = (Symbol::new(env, ORG_REMOVED_TOPIC), organization.clone());
     env.events().publish(topics, ());
 }
 
-// Emit an event when a participation is registered
 pub fn participation_registered(
     env: &Env,
     organization: &Address,
     volunteer: &Address,
     task_id: &String,
     task_name: &String,
+    metadata: &Option<String>,
     timestamp: u64,
 ) {
     let topics = (
-        Symbol::new(env, "participation_registered"),
+        Symbol::new(env, PART_REGISTERED_TOPIC),
         organization.clone(),
         volunteer.clone(),
-        task_id.clone(),
+        task_id.clone(), 
     );
     
-    // Create event data with task name and timestamp
-    let data = (task_name.clone(), timestamp);
-    
+    let data = (task_name.clone(), timestamp, metadata.clone());
+
     env.events().publish(topics, data);
 }
