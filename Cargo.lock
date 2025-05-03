@@ -899,6 +899,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "proof-of-participation"
+version = "0.1.0"
+dependencies = [
+ "soroban-sdk",
+]
+
+[[package]]
 name = "quote"
 version = "1.0.38"
 source = "registry+https://github.com/rust-lang/crates.io-index"
