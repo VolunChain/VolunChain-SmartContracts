@@ -36,18 +36,4 @@ pub enum AdminError {
     UnauthorizedSender = 2,
 }
 
-/// @notice NFT-related error codes
-#[contracterror]
-#[derive(Debug, Clone, PartialEq)]
-pub enum NFTError {
-    IDExists = 1,
-    IDInvalid = 2,
-    UnauthorizedOwner = 3,
-    BadgeNotFound = 4,
-    VolunteerNotEndorsed = 5,
-    OrganizationNotAuthorized = 6,
-    MetadataInvalid = 7,
-    EventNotFound = 8,
-    TokenCannotBeTransferred = 9,
-    OperationNotPermitted = 10,
-}
+

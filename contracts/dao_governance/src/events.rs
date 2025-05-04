@@ -1,5 +1,4 @@
-use crate::types::{Proposal, ProposalStatus, Vote, VoteType};
-use soroban_sdk::{symbol_short, Address, Env, Symbol, Val, Vec};
+use soroban_sdk::{symbol_short, Address, Env, Symbol};
 
 const PROPOSAL_CREATED: Symbol = symbol_short!("PROP_CRT");
 const VOTE_CAST: Symbol = symbol_short!("VOTE_CST");

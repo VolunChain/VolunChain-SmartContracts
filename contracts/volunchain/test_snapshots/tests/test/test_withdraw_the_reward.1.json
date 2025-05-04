@@ -221,6 +221,18 @@
                                       },
                                       {
                                         "key": {
+                                          "symbol": "difficulty"
+                                        },
+                                        "val": {
+                                          "vec": [
+                                            {
+                                              "symbol": "Low"
+                                            }
+                                          ]
+                                        }
+                                      },
+                                      {
+                                        "key": {
                                           "symbol": "status"
                                         },
                                         "val": {
@@ -245,6 +257,18 @@
                                         },
                                         "val": {
                                           "string": "Second task"
+                                        }
+                                      },
+                                      {
+                                        "key": {
+                                          "symbol": "difficulty"
+                                        },
+                                        "val": {
+                                          "vec": [
+                                            {
+                                              "symbol": "Low"
+                                            }
+                                          ]
                                         }
                                       },
                                       {

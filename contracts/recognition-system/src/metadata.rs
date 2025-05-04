@@ -1,9 +1,8 @@
-use crate::{
-    datatype::{NFTError, NFTMetadata, RecognitionNFT},
-    interfaces::MetadataOperations,
-    RecognitionSystemContract,
-};
+use nft_core::NFTError;
+use crate::datatype::{NFTMetadata, RecognitionNFT};
 use soroban_sdk::{Address, Env, String};
+use crate::interfaces::MetadataOperations;
+use crate::RecognitionSystemContract;
 
 #[allow(dead_code)]
 impl MetadataOperations for RecognitionSystemContract {

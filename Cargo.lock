@@ -948,6 +948,7 @@ dependencies = [
 name = "recognition-system"
 version = "0.0.0"
 dependencies = [
+ "nft-core",
  "reputation-system",
  "soroban-sdk",
 ]
@@ -956,6 +957,7 @@ dependencies = [
 name = "reputation-system"
 version = "0.0.0"
 dependencies = [
+ "nft-core",
  "soroban-sdk",
 ]
 

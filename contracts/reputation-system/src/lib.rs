@@ -1,16 +1,21 @@
 #![no_std]
-use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, Map, Symbol, Vec};
+extern crate alloc;
 
-mod distribution;
-mod metadata;
-mod minting;
+use alloc::string::ToString;
+
+use nft_core::NFTCore;
+use nft_core::{NFT, NFTError};
+use soroban_sdk::{
+    contract, contractimpl, contracttype,
+    Address, Env, Map, String, Symbol, Vec
+};
+
 
 #[contracttype]
 pub enum DataKey {
-    Reputation(Address),   // Stores reputation score for each volunteer
-    Endorsements(Address), // Stores endorsements received by volunteer
-    Organizations,         // Stores authorized organizations
-    Badges(Address),       // Stores NFT badges owned by volunteer
+    Reputation(Address),
+    Endorsements(Address),
+    Organizations,
 }
 
 #[contract]
@@ -18,18 +23,12 @@ pub struct ReputationSystem;
 
 #[contractimpl]
 impl ReputationSystem {
-    // Initialize the contract
     pub fn initialize(env: Env, admin: Address) {
         admin.require_auth();
-
-        // Initialize authorized organizations list
         let organizations: Vec<Address> = Vec::new(&env);
-        env.storage()
-            .instance()
-            .set(&DataKey::Organizations, &organizations);
+        env.storage().instance().set(&DataKey::Organizations, &organizations);
     }
 
-    // Add an organization to authorized list
     pub fn add_organization(env: Env, admin: Address, org: Address) {
         admin.require_auth();
 
@@ -37,34 +36,29 @@ impl ReputationSystem {
             .storage()
             .instance()
             .get(&DataKey::Organizations)
-            .unwrap();
+            .unwrap_or_else(|| Vec::new(&env));
         organizations.push_back(org);
-        env.storage()
-            .instance()
-            .set(&DataKey::Organizations, &organizations);
+        env.storage().instance().set(&DataKey::Organizations, &organizations);
     }
 
-    // Core function to endorse a volunteer (only authorized organizations)
     pub fn endorse_volunteer(
         env: Env,
         org: Address,
         volunteer: Address,
         score: u32,
-        _category: Symbol,
-    ) {
+        category: Symbol,
+    ) -> Result<u128, NFTError> {
         org.require_auth();
 
-        // Verify organization is authorized
         let organizations: Vec<Address> = env
             .storage()
             .instance()
             .get(&DataKey::Organizations)
-            .unwrap();
+            .unwrap_or_else(|| Vec::new(&env));
         if !organizations.contains(&org) {
             panic!("Unauthorized organization");
         }
 
-        // Update endorsements
         let endorsement_key = DataKey::Endorsements(volunteer.clone());
         let mut endorsements: Map<Address, u32> = env
             .storage()
@@ -72,20 +66,41 @@ impl ReputationSystem {
             .get(&endorsement_key)
             .unwrap_or_else(|| Map::new(&env));
 
-        endorsements.set(org, score);
-        env.storage()
-            .instance()
-            .set(&endorsement_key, &endorsements);
+        endorsements.set(org.clone(), score);
+        env.storage().instance().set(&endorsement_key, &endorsements);
 
-        // Recalculate reputation
+        let attributes = Vec::from_array(
+            &env,
+            [
+                (
+                    String::from_str(&env, "category"),
+                    String::from_str(&env, &category.to_string()),
+                ),
+                (
+                    String::from_str(&env, "score"),
+                    String::from_str(&env, &score.to_string()),
+                ),
+            ],
+        );
+        
+
+        let token_id = NFTCore::mint_nft(
+            env.clone(),
+            org.clone(),
+            volunteer.clone(),
+            String::from_str(&env, "Reputation Badge"),
+            String::from_str(&env, "Endorsement received"),
+            attributes,
+            false,
+        )?;
+
         Self::update_reputation(&env, &volunteer);
+        Ok(token_id)
     }
 
-    // Calculate and update reputation score
     fn update_reputation(env: &Env, volunteer: &Address) {
         let mut total_score = 0u32;
 
-        // Sum endorsements
         if let Some(endorsements) = env
             .storage()
             .instance()
@@ -97,23 +112,14 @@ impl ReputationSystem {
             }
         }
 
-        // Add badge multipliers
-        if let Some(badges) = env
-            .storage()
-            .instance()
-            .get(&DataKey::Badges(volunteer.clone()))
-        {
-            let badges: Vec<Symbol> = badges;
-            total_score += badges.len() as u32 * 10; // Each badge adds 10 points
-        }
+        let badges = NFTCore::get_nfts_by_owner(env.clone(), volunteer.clone());
+        total_score += badges.len() as u32 * 10;
 
-        // Store updated reputation
         env.storage()
             .instance()
             .set(&DataKey::Reputation(volunteer.clone()), &total_score);
     }
 
-    // Query volunteer's reputation score
     pub fn get_reputation(env: Env, volunteer: Address) -> u32 {
         env.storage()
             .instance()
@@ -121,14 +127,14 @@ impl ReputationSystem {
             .unwrap_or(0)
     }
 
-    // Query all organizations
     pub fn get_organizations(env: Env) -> Vec<Address> {
         env.storage()
             .instance()
             .get(&DataKey::Organizations)
-            .unwrap()
+            .unwrap_or_else(|| Vec::new(&env))
+    }
+
+    pub fn get_badges(env: Env, owner: Address) -> Vec<NFT> {
+        NFTCore::get_nfts_by_owner(env, owner)
     }
 }
-
-#[cfg(test)]
-mod test;

@@ -1,7 +1,7 @@
 #![no_std]
 use soroban_sdk::{contract, contractimpl, Address, Env, String, Vec};
 
-mod types;
+pub mod types;
 mod storage;
 mod minting;
 mod admin;

@@ -1,5 +1,5 @@
 // src/clients.rs
-use soroban_sdk::{Address, Env, Symbol};
+use soroban_sdk::{Address, Env};
 
 /// A client for the reputation contract.
 pub struct ReputationClient<'a> {
@@ -14,7 +14,7 @@ impl<'a> ReputationClient<'a> {
 
     /// Calls the reputation contract to get the reputation score for a given voter.
     /// Assumes the reputation contract has a function named `get_reputation` that takes an Address and returns a u128.
-    pub fn get_reputation(&self, voter: &Address) -> u64 {
+    pub fn get_reputation(&self, _voter: &Address) -> u64 {
         // In a real implementation, you’d invoke the contract.
         // For example, if you had a generated client or using env.invoke_contract:
         // self.env.invoke_contract(self.contract_id, &Symbol::short("get_rep"), voter)
@@ -37,7 +37,7 @@ impl<'a> ERC721Client<'a> {
 
     /// Calls the ERC721 contract to get the NFT balance (voting power) for a given owner.
     /// Assumes the ERC721 contract exposes a function named `balance_of` returning a u128.
-    pub fn balance_of(&self, owner: &Address) -> u64 {
+    pub fn balance_of(&self, _owner: &Address) -> u64 {
         // Similar to the ReputationClient, you would call the contract.
         // For illustration, we'll return a dummy value.
         5 // dummy NFT balance (voting power)
