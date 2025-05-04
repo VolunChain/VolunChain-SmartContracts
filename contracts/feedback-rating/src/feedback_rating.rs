@@ -32,7 +32,7 @@ mod tests {
         let comment = String::from_str(&env, "Great work!");
     
         // Volunteer gives feedback to organization
-        client.submit_feedback(&volunteer, &organization, &task_id, &rating, &comment);
+        client.submit_feedback(&organization, &volunteer, &task_id, &rating, &comment);
     
         // Validate feedback was stored
         let feedbacks = client.get_feedbacks(&organization);
@@ -54,11 +54,11 @@ mod tests {
         assert_eq!(
             topics,
             vec![
-                &env,
+                &env,                               // test-utils expands this to the contract address Val
                 symbol_short!("Feedback").into_val(&env),
                 volunteer.clone().into_val(&env),
                 organization.clone().into_val(&env),
-                task_id.into_val(&env)
+                task_id.into_val(&env),
             ]
         );
     }
@@ -114,13 +114,13 @@ mod tests {
         let rating2 = 5u32;
         let comment2 = String::from_str(&env, "Excellent experience!");
     
-        client.submit_feedback(&volunteer, &organization, &task_id, &rating1, &comment1);
-        client.submit_feedback(&organization, &volunteer, &task_id, &rating2, &comment2);
-    
+        client.submit_feedback(&organization, &volunteer, &task_id, &rating1, &comment1);
+        client.submit_feedback(&volunteer, &organization, &task_id, &rating2, &comment2);
+
         let org_feedbacks = client.get_feedbacks(&organization);
-        assert_eq!(org_feedbacks.first().unwrap().rating, rating1);  // Should be 4
+          assert_eq!(org_feedbacks.first().unwrap().rating, rating1);  // now receiver=org
     
         let vol_feedbacks = client.get_feedbacks(&volunteer);
-        assert_eq!(vol_feedbacks.first().unwrap().rating, rating2);  // Should be 5
+           assert_eq!(vol_feedbacks.first().unwrap().rating, rating2);  // now receiver=vol
     }
 }
