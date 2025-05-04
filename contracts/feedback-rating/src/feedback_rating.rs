@@ -1,126 +1,173 @@
-#[cfg(test)]
-mod tests {
-    use crate::{FeedbackAndRating, FeedbackAndRatingClient};
+use soroban_sdk::{
+    contract, contractimpl, contracttype, map, symbol_short, Address, Env, Map, String, Vec,
+};
 
- 
-    use soroban_sdk::{symbol_short, testutils::{Address as _, Events as _}, vec, Address, Env, IntoVal, String};
+#[contracttype]
+#[derive(Clone, Debug)]
+pub struct Feedback {
+    pub giver: Address,
+    pub receiver: Address,
+    pub task_id: u64,
+    pub rating: u32,
+    pub comment: String,
+    pub timestamp: u64,
+}
 
-    fn setup_env() -> (Env, FeedbackAndRatingClient<'static>, Address, Address, u64) {
-        let env = Env::default();
-        env.mock_all_auths();
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum DataKey {
+    Feedbacks,    // Address => Vec<Feedback>
+    HasFeedback,  // (giver, receiver, task_id) => bool
+    Participants, // task_id => Vec<Address>
+}
 
-        let contract_id = env.register(FeedbackAndRating, ());
-        let client = FeedbackAndRatingClient::new(&env, &contract_id);
+#[contract]
+pub struct FeedbackAndRating;
 
-        let volunteer = Address::generate(&env);
-        let organization = Address::generate(&env);
-        let task_id = 1u64;
+#[contractimpl]
+impl FeedbackAndRating {
+    pub fn initialize(_env: Env) {}
 
-        // Register participants
-        client.register_participant(&task_id, &volunteer);
-        client.register_participant(&task_id, &organization);
+    pub fn register_participant(env: Env, task_id: u64, participant: Address) {
+        participant.require_auth();
+        let admin = env.current_contract_address();
+        admin.require_auth();
 
-        
+        // Load or initialize participants map
+        let mut task_participants: Map<u64, Vec<Address>> = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Participants)
+            .unwrap_or(map![&env]);
 
-        (env, client, volunteer, organization, task_id)
+        let mut participants = task_participants
+            .get(task_id)
+            .unwrap_or_else(|| Vec::new(&env));
+
+        if !participants.contains(&participant) {
+            participants.push_back(participant.clone());
+            task_participants.set(task_id, participants);
+            env.storage()
+                .persistent()
+                .set(&DataKey::Participants, &task_participants);
+        }
     }
 
-    #[test]
-    fn test_submit_feedback_success() {
-        let (env, client, volunteer, organization, task_id) = setup_env();
-        let rating = 4u32;
-        let comment = String::from_str(&env, "Great work!");
-    
-        // Volunteer gives feedback to organization
-        client.submit_feedback(&organization, &volunteer, &task_id, &rating, &comment);
-    
-        // Validate feedback was stored
-        let feedbacks = client.get_feedbacks(&organization);
-        assert_eq!(feedbacks.len(), 1);
-        let feedback = feedbacks.first().unwrap();
-        assert_eq!(feedback.giver, volunteer);
-        assert_eq!(feedback.receiver, organization);
-        assert_eq!(feedback.task_id, task_id);
-        assert_eq!(feedback.rating, rating);
-        assert_eq!(feedback.comment, comment);
-        assert_eq!(feedback.timestamp, env.ledger().timestamp());
-    
-        // Validate emitted event
-        let events = env.events().all();
-        assert_eq!(events.len(), 1);
-    
-        let (emitter, topics, data) = events.first().unwrap(); // Destructure the tuple
-    
-        assert_eq!(
-            topics,
-            vec![
-                &env,                               // test-utils expands this to the contract address Val
-                symbol_short!("Feedback").into_val(&env),
-                volunteer.clone().into_val(&env),
-                organization.clone().into_val(&env),
-                task_id.into_val(&env),
-            ]
+    pub fn submit_feedback(
+        env: Env,
+        receiver: Address,
+        giver: Address,
+        task_id: u64,
+        rating: u32,
+        comment: String,
+    ) -> Vec<Feedback> {
+        // 1. Auth & sanity checks
+        giver.require_auth();
+        if receiver == giver {
+            panic!("Cannot give feedback to self");
+        }
+
+        // 2. Participant validation
+        let participants_map: Map<u64, Vec<Address>> = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Participants)
+            .unwrap_or(map![&env]);
+        let participants = participants_map
+            .get(task_id)
+            .unwrap_or_else(|| Vec::new(&env));
+        if !participants.contains(&giver) || !participants.contains(&receiver) {
+            panic!("Unauthorized participant");
+        }
+
+        // 3. Duplicate check
+        let mut has_fb_map: Map<(Address, Address, u64), bool> = env
+            .storage()
+            .persistent()
+            .get(&DataKey::HasFeedback)
+            .unwrap_or(map![&env]);
+        let fb_key = (giver.clone(), receiver.clone(), task_id);
+        if has_fb_map.get(fb_key.clone()).unwrap_or(false) {
+            panic!("Feedback already submitted");
+        }
+
+        // 4. Validation
+        if rating < 1 || rating > 5 {
+            panic!("Invalid rating");
+        }
+        if comment.len() > 500 {
+            panic!("Comment too long");
+        }
+
+        // 5. Build feedback entry
+        let feedback = Feedback {
+            giver: giver.clone(),
+            receiver: receiver.clone(),
+            task_id,
+            rating,
+            comment: comment.clone(),
+            timestamp: env.ledger().timestamp(),
+        };
+
+        // Append to feedback list
+        let mut feedbacks_map: Map<Address, Vec<Feedback>> = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Feedbacks)
+            .unwrap_or(map![&env]);
+        let mut feedback_list = feedbacks_map
+            .get(receiver.clone())
+            .unwrap_or_else(|| Vec::new(&env));
+
+        feedback_list.push_back(feedback.clone());
+        feedbacks_map.set(receiver.clone(), feedback_list.clone());
+        env.storage()
+            .persistent()
+            .set(&DataKey::Feedbacks, &feedbacks_map);
+
+        // Mark feedback as submitted
+        has_fb_map.set(fb_key, true);
+        env.storage()
+            .persistent()
+            .set(&DataKey::HasFeedback, &has_fb_map);
+
+        // Emit event
+        let contract_addr = env.current_contract_address();
+        env.events().publish(
+            (
+                contract_addr,
+                symbol_short!("Feedback"),
+                giver.clone(),
+                receiver.clone(),
+                task_id,
+            ),
+            (), // event payload (empty)
         );
-    }
-    
-    #[test]
-    #[should_panic(expected = "Feedback already submitted")]
-    fn test_reject_duplicate_feedback() {
-        let (env, client, volunteer, organization, task_id) = setup_env();
-        let rating = 4u32;
-        let comment = String::from_str(&env, "Great work!");
 
-        client.submit_feedback(&volunteer, &organization, &task_id, &rating, &comment);
-        client.submit_feedback(&volunteer, &organization, &task_id, &rating, &comment);
+        feedback_list
     }
 
-    #[test]
-    #[should_panic(expected = "Invalid rating")]
-    fn test_reject_invalid_rating() {
-        let (env, client, volunteer, organization, task_id) = setup_env();
-        let invalid_rating = 6u32;
-        let comment = String::from_str(&env, "Invalid rating test");
-
-        client.submit_feedback(&volunteer, &organization, &task_id, &invalid_rating, &comment);
+    pub fn get_feedbacks(env: Env, user: Address) -> Vec<Feedback> {
+        let feedbacks_map: Map<Address, Vec<Feedback>> = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Feedbacks)
+            .unwrap_or(map![&env]);
+        feedbacks_map.get(user).unwrap_or_else(|| Vec::new(&env))
     }
 
-    #[test]
-    #[should_panic(expected = "Unauthorized participant")]
-    fn test_reject_non_participant() {
-        let (env, client, _, organization, task_id) = setup_env();
-        let non_participant = Address::generate(&env);
-        let rating = 4u32;
-        let comment = String::from_str(&env, "Non-participant test");
-
-        client.submit_feedback(&non_participant, &organization, &task_id, &rating, &comment);
+    pub fn get_feedback_count(env: Env, user: Address) -> u32 {
+        Self::get_feedbacks(env, user).len()
     }
 
-    #[test]
-    #[should_panic(expected = "Comment too long")]
-    fn test_reject_long_comment() {
-        let (env, client, volunteer, organization, task_id) = setup_env();
-        let rating = 4u32;
-        let long_comment = String::from_str(&env, &"a".repeat(501));
-
-        client.submit_feedback(&volunteer, &organization, &task_id, &rating, &long_comment);
-    }
-
-
-      #[test]
-    fn test_get_feedbacks_and_count() {
-        let (env, client, volunteer, organization, task_id) = setup_env();
-        let rating1 = 4u32;
-        let comment1 = String::from_str(&env, "Great organization!");
-        let rating2 = 5u32;
-        let comment2 = String::from_str(&env, "Excellent experience!");
-    
-        client.submit_feedback(&organization, &volunteer, &task_id, &rating1, &comment1);
-        client.submit_feedback(&volunteer, &organization, &task_id, &rating2, &comment2);
-
-        let org_feedbacks = client.get_feedbacks(&organization);
-          assert_eq!(org_feedbacks.first().unwrap().rating, rating1);  // now receiver=org
-    
-        let vol_feedbacks = client.get_feedbacks(&volunteer);
-           assert_eq!(vol_feedbacks.first().unwrap().rating, rating2);  // now receiver=vol
+    pub fn get_participents(env: Env, task_id: u64) -> Vec<Address> {
+        let participants_map: Map<u64, Vec<Address>> = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Participants)
+            .unwrap_or(map![&env]);
+        participants_map
+            .get(task_id)
+            .unwrap_or_else(|| Vec::new(&env))
     }
 }
