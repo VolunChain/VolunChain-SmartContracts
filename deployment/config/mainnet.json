@@ -1,0 +1,19 @@
+{
+    "network": "mainnet",
+    "rpc_url": "https://mainnet-rpc.example.com",
+    "chain_id": "mainnet-1",
+    "gas_price": "auto",
+    "confirmations": 5,
+    "timeouts": {
+        "confirmation": 90,
+        "transaction": 180
+    },
+    "addresses": {
+        "deployer": "",
+        "proxy_admin": ""
+    },
+    "verify": {
+        "enabled": true,
+        "api_key": ""
+    }
+} 

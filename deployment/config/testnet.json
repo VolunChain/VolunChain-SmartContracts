@@ -1,0 +1,19 @@
+{
+    "network": "testnet",
+    "rpc_url": "https://testnet-rpc.example.com",
+    "chain_id": "testnet-1",
+    "gas_price": "auto",
+    "confirmations": 2,
+    "timeouts": {
+        "confirmation": 60,
+        "transaction": 120
+    },
+    "addresses": {
+        "deployer": "",
+        "proxy_admin": ""
+    },
+    "verify": {
+        "enabled": true,
+        "api_key": ""
+    }
+} 
