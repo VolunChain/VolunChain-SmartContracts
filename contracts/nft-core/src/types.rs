@@ -72,4 +72,12 @@ pub enum NFTError {
     InvalidRecipient = 18,
     BatchTooLarge = 19,
     ContractError = 20,
+
+
+    IDInvalid = 21,
+    BadgeNotFound = 22,
+    OrganizationNotAuthorized = 23,
+    MetadataInvalid = 24,
+    TokenCannotBeTransferred = 25,
+    UnauthorizedOwner = 26,
 }

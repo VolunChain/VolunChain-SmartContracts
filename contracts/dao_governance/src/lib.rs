@@ -7,7 +7,7 @@ mod governance;
 mod storage;
 mod types;
 
-use types::{DaoConfig, DaoError, Proposal, ProposalStatus, ProposalType, VoteType};
+use types::{DaoConfig, DaoError, Proposal, ProposalType, VoteType};
 
 #[contract]
 pub struct DaoContract;
@@ -88,7 +88,7 @@ impl DaoContract {
     }
 
     // Finalize a proposal
-    pub fn finalize_proposal(env: Env, caller: Address, proposal_id: u32) -> Result<(), DaoError> {
+    pub fn finalize_proposal(env: Env, _caller: Address, proposal_id: u32) -> Result<(), DaoError> {
         governance::finalize_proposal(&env, proposal_id)
     }
 

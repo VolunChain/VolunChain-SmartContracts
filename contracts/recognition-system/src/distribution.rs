@@ -1,8 +1,10 @@
+use nft_core::NFTError;
 use crate::{
-    datatype::{NFTError, RecognitionNFT},
+    datatype::RecognitionNFT,
     interfaces::DistributionOperations,
     RecognitionSystemContract,
 };
+
 use soroban_sdk::{Address, Env, Map, Symbol, Vec};
 
 impl DistributionOperations for RecognitionSystemContract {

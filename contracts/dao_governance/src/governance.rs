@@ -4,12 +4,12 @@ use crate::events::{
     emit_proposal_created, emit_proposal_executed, emit_proposal_finalized, emit_vote_cast,
 };
 use crate::storage::{
-    get_config, get_proposal, get_proposal_count, has_voted, increment_proposal_count,
+    get_config, get_proposal, has_voted, increment_proposal_count,
     save_proposal, save_vote,
 };
 use crate::types::{DaoError, Proposal, ProposalStatus, ProposalType, Vote, VoteType};
 use core::cmp::max;
-use soroban_sdk::{Address, Env, String, Vec};
+use soroban_sdk::{Address, Env, String};
 
 pub fn create_proposal(
     env: &Env,
@@ -118,7 +118,7 @@ pub fn finalize_proposal(env: &Env, proposal_id: u32) -> Result<(), DaoError> {
     }
 
     let total_votes = proposal.upvotes + proposal.downvotes;
-    let config = get_config(env);
+    let _config = get_config(env);
     if total_votes < proposal.minimum_quorum {
         proposal.status = ProposalStatus::Rejected;
         save_proposal(env, &proposal);

@@ -1,14 +1,14 @@
 #![no_std]
-use datatype::{AdminError, DataKeys, NFTError, NFTMetadata, RecognitionNFT};
-use soroban_sdk::{
-    contract, contractimpl, Address, Env, String, Symbol, Vec,
-};
 
+use datatype::{AdminError, DataKeys, NFTMetadata, RecognitionNFT};
+use nft_core::NFTError;
+use soroban_sdk::{contract, contractimpl, Address, Env, String, Symbol, Vec};
+use soroban_sdk::vec;
+use nft_core::{NFTCore};
 mod datatype;
 mod distribution;
 mod interfaces;
 mod metadata;
-mod minting;
 
 #[cfg(test)]
 mod test;
@@ -22,23 +22,15 @@ pub struct RecognitionSystemContract;
 #[contractimpl]
 impl RecognitionSystemContract {
     /// @notice Initializes the contract with an admin who can perform privileged operations
-    /// @param env The contract environment
-    /// @param admin The address of the contract administrator
-    /// @return Result indicating success or initialization error
     pub fn initialize(env: Env, admin: Address) -> Result<(), AdminError> {
-        // Check if already initialized
         if env.storage().instance().has(&DataKeys::Admin) {
             return Err(AdminError::AlreadyInitialized);
         }
 
-        // Require authentication from admin
         admin.require_auth();
-        
-        // Set admin and initialize token counter
         env.storage().instance().set(&DataKeys::Admin, &admin);
         env.storage().instance().set(&DataKeys::TokenCounter, &0);
 
-        // Emit initialization event
         env.events().publish(
             (Symbol::new(&env, "Contract Initialized"), admin.clone()),
             env.ledger().timestamp(),
@@ -47,9 +39,7 @@ impl RecognitionSystemContract {
         Ok(())
     }
 
-    /// @notice Retrieves the admin address for this contract
-    /// @param env The contract environment
-    /// @return The admin address or an error if not found
+    /// @notice Retrieves the contract administrator
     pub fn get_admin(env: Env) -> Result<Address, AdminError> {
         env.storage()
             .instance()
@@ -57,31 +47,76 @@ impl RecognitionSystemContract {
             .ok_or(AdminError::UnauthorizedSender)
     }
 
-    /// @notice Retrieves a specific NFT badge by its ID
-    /// @param env The contract environment
-    /// @param token_id The unique identifier of the badge
-    /// @return The badge details or error if not found
-    pub fn get_volunteer_badge(env: Env, token_id: u128) -> Result<RecognitionNFT, NFTError> {
-        // Try to retrieve the NFT from persistent storage
-        if let Some(nft) = env
+    /// @notice Delegates the minting of a recognition badge to the centralized NFTCore contract
+    pub fn mint_recognition_badge(
+        env: Env,
+        recipient: Address,
+        organization: Address,
+        title: String,
+        date: String,
+        task: String,
+    ) -> Result<u128, NFTError> {
+        // Require the recipient to authorize the action
+        recipient.require_auth();
+
+        // Validate input fields
+        if title.len() == 0 || date.len() == 0 || task.len() == 0 {
+            return Err(NFTError::MetadataInvalid);
+        }
+
+        // Only allow authorized organizations to mint
+        if !Self::verify_authorized_organization(&env, organization.clone()) {
+            return Err(NFTError::OrganizationNotAuthorized);
+        }
+
+        // Convert inputs into NFT attributes
+        let attributes = Vec::from_array(
+            &env,
+            [
+                (String::from_str(&env, "task"), task),
+                (String::from_str(&env, "date"), date),
+            ],
+        );
+        
+
+        let badge_metadata = String::from_str(&env, "https://example.com/metadata.json");
+
+        // Mint the NFT via the shared NFTCore module
+        NFTCore::mint_nft(
+            env.clone(),
+            organization,
+            recipient,
+            String::from_str(&env, "Recognition Badge"),
+            badge_metadata,
+            attributes,
+            false,
+        )
+        
+    }
+
+    /// @notice Verifies if an organization is authorized to mint badges
+    fn verify_authorized_organization(env: &Env, org: Address) -> bool {
+        use reputation_system::DataKey;
+        match env
             .storage()
-            .persistent()
-            .get(&token_id) {
-            Ok(nft)
-        } else {
-            Err(NFTError::IDInvalid)
+            .instance()
+            .get::<_, Vec<Address>>(&DataKey::Organizations)
+        {
+            Some(orgs) => orgs.contains(&org),
+            None => false,
         }
     }
 
-    /// @notice Retrieves all badges owned by a specific volunteer
-    /// @param env The contract environment
-    /// @param volunteer The address of the volunteer
-    /// @return A vector of badges owned by the volunteer
-    pub fn get_volunteer_badges(
-        env: Env,
-        volunteer: Address,
-    ) -> Result<Vec<RecognitionNFT>, NFTError> {
-        // Get the list of token IDs owned by this volunteer
+    /// @notice Fetches a single badge by ID
+    pub fn get_volunteer_badge(env: Env, token_id: u128) -> Result<RecognitionNFT, NFTError> {
+        env.storage()
+            .persistent()
+            .get(&token_id)
+            .ok_or(NFTError::IDInvalid)
+    }
+
+    /// @notice Fetches all badges owned by a given volunteer
+    pub fn get_volunteer_badges(env: Env, volunteer: Address) -> Result<Vec<RecognitionNFT>, NFTError> {
         let badges_key = DataKeys::VolunteerRecognition(volunteer.clone());
         let token_ids: Vec<u128> = env
             .storage()
@@ -89,7 +124,6 @@ impl RecognitionSystemContract {
             .get(&badges_key)
             .unwrap_or_else(|| Vec::new(&env));
 
-        // Load each NFT by its ID and collect in a vector
         let mut nfts: Vec<RecognitionNFT> = Vec::new(&env);
         for id in token_ids.iter() {
             if let Some(nft) = env.storage().persistent().get(&id) {
@@ -100,25 +134,17 @@ impl RecognitionSystemContract {
         Ok(nfts)
     }
 
-    /// @notice Gets the metadata for a specific badge
-    /// @param env The contract environment
-    /// @param token_id The unique identifier of the badge
-    /// @return The badge's metadata or error if not found
+    /// @notice Fetches the metadata for a badge by token ID
     pub fn get_metadata(env: &Env, token_id: u128) -> Result<NFTMetadata, NFTError> {
         let nft: RecognitionNFT = env
             .storage()
             .persistent()
             .get(&token_id)
             .ok_or(NFTError::BadgeNotFound)?;
-
         Ok(nft.metadata)
     }
 
     /// @notice Checks if a volunteer owns a specific badge
-    /// @param env The contract environment
-    /// @param volunteer The address of the volunteer
-    /// @param token_id The unique identifier of the badge
-    /// @return true if volunteer owns the badge, false otherwise
     pub fn has_badge(env: Env, volunteer: Address, token_id: u128) -> bool {
         let badges_key = DataKeys::VolunteerRecognition(volunteer.clone());
         if let Some(token_ids) = env.storage().persistent().get::<_, Vec<u128>>(&badges_key) {
@@ -127,12 +153,8 @@ impl RecognitionSystemContract {
             false
         }
     }
-    
-    /// @notice Checks if a volunteer has any badges from a specific organization
-    /// @param env The contract environment
-    /// @param volunteer The address of the volunteer
-    /// @param org The address of the organization
-    /// @return true if volunteer has any badges from the org, false otherwise
+
+    /// @notice Checks if a volunteer has received a badge from a given organization
     pub fn has_org_badge(env: Env, volunteer: Address, org: Address) -> bool {
         if let Ok(badges) = Self::get_volunteer_badges(env.clone(), volunteer) {
             for badge in badges.iter() {
@@ -144,10 +166,7 @@ impl RecognitionSystemContract {
         false
     }
 
-    /// @notice Gets the total number of badges owned by a volunteer
-    /// @param env The contract environment
-    /// @param volunteer The address of the volunteer
-    /// @return The number of badges owned
+    /// @notice Returns the number of badges owned by a volunteer
     pub fn get_badge_count(env: Env, volunteer: Address) -> u32 {
         let badges_key = DataKeys::VolunteerRecognition(volunteer.clone());
         if let Some(token_ids) = env.storage().persistent().get::<_, Vec<u128>>(&badges_key) {
@@ -156,11 +175,8 @@ impl RecognitionSystemContract {
             0
         }
     }
-    
-    /// @notice Gets the IDs of all badges owned by a volunteer
-    /// @param env The contract environment
-    /// @param volunteer The address of the volunteer
-    /// @return A vector of badge IDs owned by the volunteer
+
+    /// @notice Returns a list of token IDs for all badges owned by a volunteer
     pub fn get_badge_ids(env: Env, volunteer: Address) -> Result<Vec<u128>, NFTError> {
         let badges_key = DataKeys::VolunteerRecognition(volunteer.clone());
         let token_ids = env
@@ -168,14 +184,11 @@ impl RecognitionSystemContract {
             .persistent()
             .get(&badges_key)
             .unwrap_or_else(|| Vec::new(&env));
-            
+
         Ok(token_ids)
     }
-    
-    /// @notice Exports badge data in a simplified format for external applications
-    /// @param env The contract environment
-    /// @param token_id The unique identifier of the badge
-    /// @return Tuple of (org_address, title, date, task) or error if not found
+
+    /// @notice Returns exported badge data in a simplified format
     pub fn export_badge_data(env: Env, token_id: u128) -> Result<(Address, String, String, String), NFTError> {
         let nft = Self::get_volunteer_badge(env.clone(), token_id)?;
         Ok((
