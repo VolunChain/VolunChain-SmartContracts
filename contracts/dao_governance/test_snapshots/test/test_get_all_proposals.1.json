@@ -115,6 +115,14 @@
                             },
                             {
                               "key": {
+                                "symbol": "paused"
+                              },
+                              "val": {
+                                "bool": false
+                              }
+                            },
+                            {
+                              "key": {
                                 "symbol": "proposal_creation_threshold"
                               },
                               "val": {
