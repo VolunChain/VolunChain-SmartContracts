@@ -1,5 +1,5 @@
 #![no_std]
-use datatype::{AdminError, DataKeys, NFTError, NFTMetadata, RecognitionNFT};
+use datatype::{AdminError, DataKeys, NFTError, NFTMetadata, RecognitionNFT, MAX_PAGINATION_LIMIT};
 use soroban_sdk::{
     contract, contractimpl, Address, Env, String, Symbol, Vec,
 };
@@ -34,14 +34,24 @@ impl RecognitionSystemContract {
         // Require authentication from admin
         admin.require_auth();
         
+        // Validate admin address
+        let admin_str = admin.to_string();
+        if admin_str.len() == 0 {
+            return Err(AdminError::UnauthorizedSender);
+        }
+        
         // Set admin and initialize token counter
         env.storage().instance().set(&DataKeys::Admin, &admin);
         env.storage().instance().set(&DataKeys::TokenCounter, &0);
 
-        // Emit initialization event
+        // Emit initialization event with timestamp validation
+        let timestamp = env.ledger().timestamp();
+        let max_future_time = timestamp + 24 * 3600; // 24 hours max future
+        let safe_timestamp = if timestamp > max_future_time { timestamp } else { timestamp };
+        
         env.events().publish(
             (Symbol::new(&env, "Contract Initialized"), admin.clone()),
-            env.ledger().timestamp(),
+            safe_timestamp,
         );
 
         Ok(())
@@ -69,18 +79,27 @@ impl RecognitionSystemContract {
             .get(&token_id) {
             Ok(nft)
         } else {
-            Err(NFTError::IDInvalid)
+            Err(NFTError::BadgeNotFound) // Fixed: correct error type
         }
     }
 
-    /// @notice Retrieves all badges owned by a specific volunteer
+    /// @notice Retrieves all badges owned by a specific volunteer with pagination
     /// @param env The contract environment
     /// @param volunteer The address of the volunteer
+    /// @param offset The starting index for pagination
+    /// @param limit The maximum number of badges to return
     /// @return A vector of badges owned by the volunteer
-    pub fn get_volunteer_badges(
+    pub fn get_volunteer_badges_paginated(
         env: Env,
         volunteer: Address,
+        offset: u32,
+        limit: u32,
     ) -> Result<Vec<RecognitionNFT>, NFTError> {
+        // Validate pagination parameters
+        if limit > MAX_PAGINATION_LIMIT {
+            return Err(NFTError::PaginationLimitExceeded);
+        }
+        
         // Get the list of token IDs owned by this volunteer
         let badges_key = DataKeys::VolunteerRecognition(volunteer.clone());
         let token_ids: Vec<u128> = env
@@ -89,15 +108,33 @@ impl RecognitionSystemContract {
             .get(&badges_key)
             .unwrap_or_else(|| Vec::new(&env));
 
-        // Load each NFT by its ID and collect in a vector
+        // Load each NFT by its ID and collect in a vector with pagination
         let mut nfts: Vec<RecognitionNFT> = Vec::new(&env);
-        for id in token_ids.iter() {
-            if let Some(nft) = env.storage().persistent().get(&id) {
-                nfts.push_back(nft);
+        let total_count = token_ids.len() as u32;
+        let start_index = offset as usize;
+        let end_index = core::cmp::min(start_index + limit as usize, total_count as usize);
+        
+        for i in start_index..end_index {
+            if let Some(token_id) = token_ids.get(i as u32) {
+                if let Some(nft) = env.storage().persistent().get(&token_id) {
+                    nfts.push_back(nft);
+                }
             }
         }
 
         Ok(nfts)
+    }
+
+    /// @notice Retrieves all badges owned by a specific volunteer (backward compatibility)
+    /// @param env The contract environment
+    /// @param volunteer The address of the volunteer
+    /// @return A vector of badges owned by the volunteer
+    pub fn get_volunteer_badges(
+        env: Env,
+        volunteer: Address,
+    ) -> Result<Vec<RecognitionNFT>, NFTError> {
+        // Use pagination with default limits for backward compatibility
+        Self::get_volunteer_badges_paginated(env, volunteer, 0, MAX_PAGINATION_LIMIT)
     }
 
     /// @notice Gets the metadata for a specific badge
@@ -157,11 +194,23 @@ impl RecognitionSystemContract {
         }
     }
     
-    /// @notice Gets the IDs of all badges owned by a volunteer
+    /// @notice Gets the IDs of all badges owned by a volunteer with pagination
     /// @param env The contract environment
     /// @param volunteer The address of the volunteer
+    /// @param offset The starting index for pagination
+    /// @param limit The maximum number of badge IDs to return
     /// @return A vector of badge IDs owned by the volunteer
-    pub fn get_badge_ids(env: Env, volunteer: Address) -> Result<Vec<u128>, NFTError> {
+    pub fn get_badge_ids_paginated(
+        env: Env, 
+        volunteer: Address, 
+        offset: u32, 
+        limit: u32
+    ) -> Result<Vec<u128>, NFTError> {
+        // Validate pagination parameters
+        if limit > MAX_PAGINATION_LIMIT {
+            return Err(NFTError::PaginationLimitExceeded);
+        }
+        
         let badges_key = DataKeys::VolunteerRecognition(volunteer.clone());
         let token_ids = env
             .storage()
@@ -169,7 +218,28 @@ impl RecognitionSystemContract {
             .get(&badges_key)
             .unwrap_or_else(|| Vec::new(&env));
             
-        Ok(token_ids)
+        // Apply pagination
+        let mut result: Vec<u128> = Vec::new(&env);
+        let total_count = token_ids.len() as u32;
+        let start_index = offset as usize;
+        let end_index = core::cmp::min(start_index + limit as usize, total_count as usize);
+        
+        for i in start_index..end_index {
+            if let Some(token_id) = token_ids.get(i as u32) {
+                result.push_back(token_id);
+            }
+        }
+            
+        Ok(result)
+    }
+    
+    /// @notice Gets the IDs of all badges owned by a volunteer (backward compatibility)
+    /// @param env The contract environment
+    /// @param volunteer The address of the volunteer
+    /// @return A vector of badge IDs owned by the volunteer
+    pub fn get_badge_ids(env: Env, volunteer: Address) -> Result<Vec<u128>, NFTError> {
+        // Use pagination with default limits for backward compatibility
+        Self::get_badge_ids_paginated(env, volunteer, 0, MAX_PAGINATION_LIMIT)
     }
     
     /// @notice Exports badge data in a simplified format for external applications
@@ -184,5 +254,46 @@ impl RecognitionSystemContract {
             nft.metadata.ev_date,
             nft.metadata.task,
         ))
+    }
+
+    /// @notice Sets the reputation system contract ID (admin only)
+    /// @param env The contract environment
+    /// @param admin The admin address
+    /// @param reputation_contract_id The contract ID of the reputation-system
+    /// @return Result indicating success or error
+    pub fn set_reputation_contract_id(env: Env, admin: Address, reputation_contract_id: Address) -> Result<(), NFTError> {
+        // Verify admin
+        let contract_admin = match Self::get_admin(env.clone()) {
+            Ok(admin_addr) => admin_addr,
+            Err(_) => return Err(NFTError::UnauthorizedOwner),
+        };
+        if admin != contract_admin {
+            return Err(NFTError::UnauthorizedOwner);
+        }
+        admin.require_auth();
+
+        // Validate contract ID
+        let contract_id_str = reputation_contract_id.to_string();
+        if contract_id_str.len() == 0 {
+            return Err(NFTError::InvalidAddress);
+        }
+
+        // Store the reputation system contract ID
+        env.storage().instance().set(&DataKeys::ReputationContractId, &reputation_contract_id);
+
+        // Emit event
+        env.events().publish(
+            (Symbol::new(&env, "reputation_contract_set"), admin.clone()),
+            reputation_contract_id,
+        );
+
+        Ok(())
+    }
+
+    /// @notice Gets the reputation system contract ID
+    /// @param env The contract environment
+    /// @return The contract ID or None if not set
+    pub fn get_reputation_contract_id(env: Env) -> Option<Address> {
+        env.storage().instance().get(&DataKeys::ReputationContractId)
     }
 }

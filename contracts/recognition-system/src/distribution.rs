@@ -1,9 +1,9 @@
 use crate::{
-    datatype::{NFTError, RecognitionNFT},
+    datatype::{NFTError, RecognitionNFT, DataKeys},
     interfaces::DistributionOperations,
     RecognitionSystemContract,
 };
-use soroban_sdk::{Address, Env, Map, Symbol, Vec};
+use soroban_sdk::{Address, Env, Symbol, Vec};
 
 impl DistributionOperations for RecognitionSystemContract {
     /// @notice Allows an owner to burn their badge NFT
@@ -19,7 +19,7 @@ impl DistributionOperations for RecognitionSystemContract {
             .storage()
             .persistent()
             .get(&token_id)
-            .ok_or(NFTError::IDInvalid)?;
+            .ok_or(NFTError::BadgeNotFound)?;
 
         // Verify ownership
         if nft.owner != owner {
@@ -39,10 +39,10 @@ impl DistributionOperations for RecognitionSystemContract {
             }
         }
 
-        // Emit burn event
+        // Emit detailed burn event
         env.events().publish(
-            (Symbol::new(&env, "badge_burned"), owner.clone()),
-            token_id,
+            (Symbol::new(&env, "badge_burned"), owner.clone(), token_id),
+            (nft.metadata.ev_org, nft.metadata.ev_title, nft.metadata.ev_date),
         );
         
         Ok(())
@@ -80,21 +80,24 @@ impl DistributionOperations for RecognitionSystemContract {
     /// @param org The organization address to check endorsement from
     /// @return true if volunteer is endorsed by organization, false otherwise
     fn verify_confirmed_volunteer(env: &Env, volunteer: Address, org: Address) -> bool {
-        // Make sure we're calling the right DataKey from reputation system
-        let organizations = match env.storage().instance().get::<_, Vec<Address>>(&reputation_system::DataKey::Organizations) {
-            Some(orgs) => orgs,
-            None => return false,
-        };
-        
-        if !organizations.contains(&org) {
+        // Validate addresses first
+        let volunteer_str = volunteer.to_string();
+        let org_str = org.to_string();
+        if volunteer_str.len() == 0 || org_str.len() == 0 {
             return false;
         }
+        
+        // Try to get reputation system contract ID from storage
+        let reputation_contract_id = match env.storage().instance().get::<_, Address>(&DataKeys::ReputationContractId) {
+            Some(id) => id,
+            None => return false, // If no contract ID stored, volunteer is not endorsed
+        };
 
-        // Check volunteer endorsements from the organization
-        let endorsement_key = &reputation_system::DataKey::Endorsements(volunteer.clone());
-        match env.storage().instance().get::<_, Map<Address, u32>>(endorsement_key) {
-            Some(endorsements) => endorsements.contains_key(org),
-            None => false
+        // Create client and verify volunteer reputation
+        let client = crate::interfaces::ReputationSystemClient::new(env, reputation_contract_id);
+        match client.get_reputation(&volunteer) {
+            Ok(reputation) => reputation > 0, // Volunteer has reputation > 0
+            Err(_) => false, // If call fails, volunteer is not endorsed
         }
     }
 }

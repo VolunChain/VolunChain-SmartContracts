@@ -1,6 +1,6 @@
 use crate::{
-    datatype::{DataKeys, NFTError, RecognitionNFT},
-    interfaces::{MetadataOperations, MintingOperations},
+    datatype::{DataKeys, NFTError, RecognitionNFT, MAX_TITLE_LEN, MAX_DATE_LEN, MAX_TASK_LEN},
+    interfaces::{MetadataOperations, MintingOperations, ReputationSystemClient},
     RecognitionSystemContract,
 };
 use soroban_sdk::{
@@ -31,17 +31,33 @@ impl MintingOperations for RecognitionSystemContract {
         // Require auth from recipient
         recipient.require_auth();
         
-        // Validate inputs
+        // Validate addresses
+        let recipient_str = recipient.to_string();
+        let org_str = organization.to_string();
+        if recipient_str.len() == 0 || org_str.len() == 0 {
+            return Err(NFTError::InvalidAddress);
+        }
+        
+        // Validate inputs with length limits
         if title.len() == 0 {
             return Err(NFTError::MetadataInvalid);
+        }
+        if title.len() as u32 > MAX_TITLE_LEN {
+            return Err(NFTError::TitleTooLong);
         }
         
         if date.len() == 0 {
             return Err(NFTError::MetadataInvalid);
         }
+        if date.len() as u32 > MAX_DATE_LEN {
+            return Err(NFTError::DateTooLong);
+        }
         
         if task.len() == 0 {
             return Err(NFTError::MetadataInvalid);
+        }
+        if task.len() as u32 > MAX_TASK_LEN {
+            return Err(NFTError::TaskTooLong);
         }
 
         // Check if organization is authorized
@@ -49,26 +65,44 @@ impl MintingOperations for RecognitionSystemContract {
             return Err(NFTError::OrganizationNotAuthorized);
         }
         
-        // Get or initialize token counter
-        let mut current_id: u128 = env
+        // Check badge limit for volunteer
+        let volunteer_tokens: Vec<u128> = env
+            .storage()
+            .persistent()
+            .get(&DataKeys::VolunteerRecognition(recipient.clone()))
+            .unwrap_or_else(|| Vec::new(env));
+        if volunteer_tokens.len() as u32 >= 100 { // MAX_BADGES_PER_VOLUNTEER was removed, using a placeholder value
+            return Err(NFTError::BadgeLimitExceeded);
+        }
+        
+        // Get or initialize token counter with overflow protection
+        let current_id: u128 = env
             .storage()
             .instance()
             .get(&DataKeys::TokenCounter)
             .unwrap_or(0_u128);
-        current_id += 1;
+        
+        // Check for overflow
+        if current_id == u128::MAX {
+            return Err(NFTError::TokenCounterOverflow);
+        }
+        
+        let new_id = current_id.checked_add(1)
+            .ok_or(NFTError::TokenCounterOverflow)?;
+            
         env.storage()
             .instance()
-            .set(&DataKeys::TokenCounter, &current_id);
+            .set(&DataKeys::TokenCounter, &new_id);
 
         // Create metadata and NFT
-        let metadata = Self::create_nft_metadata(organization, title, date, task)?;
+        let metadata = Self::create_nft_metadata(organization.clone(), title.clone(), date.clone(), task.clone())?;
         let nft = RecognitionNFT {
             owner: recipient.clone(),
             metadata,
         };
 
         // Store NFT by token ID
-        env.storage().persistent().set(&current_id, &nft);
+        env.storage().persistent().set(&new_id, &nft);
 
         // Update volunteer's badge list
         let mut volunteer_tokens: Vec<u128> = env
@@ -76,19 +110,19 @@ impl MintingOperations for RecognitionSystemContract {
             .persistent()
             .get(&DataKeys::VolunteerRecognition(recipient.clone()))
             .unwrap_or_else(|| Vec::new(env));
-        volunteer_tokens.push_back(current_id);
+        volunteer_tokens.push_back(new_id);
         env.storage().persistent().set(
             &DataKeys::VolunteerRecognition(recipient.clone()),
             &volunteer_tokens,
         );
 
-        // Emit event
+        // Emit detailed event
         env.events().publish(
-            (Symbol::new(env, "badge_minted"), recipient.clone()),
-            current_id,
+            (Symbol::new(env, "badge_minted"), recipient.clone(), organization.clone()),
+            (new_id, title.clone(), date.clone(), task.clone()),
         );
 
-        Ok(current_id)
+        Ok(new_id)
     }
     
     // Helper function to verify if an organization is authorized
@@ -101,10 +135,17 @@ impl MintingOperations for RecognitionSystemContract {
     /// # Returns
     /// Returns true if the organization is authorized, false otherwise.
     fn verify_authorized_organization(env: &Env, org: Address) -> bool {
-        // Check if this organization exists in the reputation system
-        match env.storage().instance().get::<_, Vec<Address>>(&reputation_system::DataKey::Organizations) {
-            Some(organizations) => organizations.contains(&org),
-            None => false
+        // Try to get reputation system contract ID from storage
+        let reputation_contract_id = match env.storage().instance().get::<_, Address>(&DataKeys::ReputationContractId) {
+            Some(id) => id,
+            None => return false, // If no contract ID stored, organization is not authorized
+        };
+
+        // Create client and verify organization
+        let client = ReputationSystemClient::new(env, reputation_contract_id);
+        match client.get_organizations() {
+            Ok(organizations) => organizations.contains(&org),
+            Err(_) => false, // If call fails, organization is not authorized
         }
     }
 }
