@@ -8,7 +8,7 @@ mod datatype;
 mod distribution;
 mod interfaces;
 mod metadata;
-mod minting;
+mod nft_minting;
 
 #[cfg(test)]
 mod test;

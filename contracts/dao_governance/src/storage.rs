@@ -63,12 +63,14 @@ pub fn has_voted(env: &Env, proposal_id: u32, voter: &Address) -> bool {
         .has(&DataKey::Vote(proposal_id, voter.clone()))
 }
 
+#[allow(dead_code)]
 pub fn get_vote(env: &Env, proposal_id: u32, voter: &Address) -> Option<Vote> {
     env.storage()
         .instance()
         .get(&DataKey::Vote(proposal_id, voter.clone()))
 }
 
+#[allow(dead_code)]
 pub fn get_votes_for_proposal(env: &Env, proposal_id: u32) -> Vec<Vote> {
     env.storage()
         .instance()

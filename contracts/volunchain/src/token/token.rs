@@ -9,6 +9,7 @@ use crate::token::metadata::write_metadata;
 use crate::storage::types::{INSTANCE_BUMP_AMOUNT, INSTANCE_LIFETIME_THRESHOLD};
 use soroban_token_sdk::TokenUtils;
 
+#[allow(dead_code)]
 fn check_nonnegative_amount(amount: i128) {
     if amount < 0 {
         panic!("negative amount is not allowed: {}", amount);
@@ -18,10 +19,12 @@ fn check_nonnegative_amount(amount: i128) {
 // This token is for testing purposes only
 
 #[contract]
+#[allow(dead_code)]
 pub struct Token;
 
 #[contractimpl]
 impl Token {
+    #[allow(dead_code)]
     pub fn initialize(e: Env, admin: Address, decimal: u32, name: String, symbol: String) {
         if has_administrator(&e) {
             panic!("already initialized");
@@ -43,6 +46,7 @@ impl Token {
         write_metadata(&e, metadata);
     }
 
+    #[allow(dead_code)]
     pub fn mint(e: Env, to: Address, amount: i128) {
         check_nonnegative_amount(amount);
 

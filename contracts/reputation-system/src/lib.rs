@@ -3,7 +3,7 @@ use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, Map, Symbo
 
 mod distribution;
 mod metadata;
-mod minting;
+mod nft_minting;
 
 #[contracttype]
 pub enum DataKey {

@@ -46,6 +46,7 @@ pub fn is_organization_registered(env: &Env, organization: &Address) -> bool {
      env.storage().persistent().has(&DataKey::Organization(organization.clone()))
 }
 
+#[allow(dead_code)]
 pub fn get_organization_name(env: &Env, organization: &Address) -> Option<String> {
     env.storage().persistent().get(&DataKey::Organization(organization.clone()))
 }

@@ -3,6 +3,7 @@ use soroban_sdk::{Address, Env};
 use crate::storage::types::{AllowanceDataKey, AllowanceValue, DataKey};
 
 
+#[allow(dead_code)]
 pub fn read_allowance(e: &Env, from: Address, spender: Address) -> AllowanceValue {
     let key = DataKey::Allowance(AllowanceDataKey { from, spender });
     if let Some(allowance) = e.storage().persistent().get::<_, AllowanceValue>(&key) {
@@ -22,6 +23,7 @@ pub fn read_allowance(e: &Env, from: Address, spender: Address) -> AllowanceValu
     }
 }
 
+#[allow(dead_code)]
 pub fn write_allowance(
     e: &Env,
     from: Address,
@@ -53,6 +55,7 @@ pub fn write_allowance(
     }
 }
 
+#[allow(dead_code)]
 pub fn spend_allowance(e: &Env, from: Address, spender: Address, amount: i128) {
     let allowance = read_allowance(e, from.clone(), spender.clone());
     if allowance.amount < amount {
