@@ -16,7 +16,7 @@ fn create_env() -> Env {
 }
 
 fn register_contract(env: &Env) -> Address {
-    env.register_contract(None, ProofOfParticipationContract)
+    env.register(ProofOfParticipationContract, ())
 }
 
 fn setup_ledger_time(env: &Env, timestamp: u64) {
