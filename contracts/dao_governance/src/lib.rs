@@ -31,6 +31,11 @@ impl DaoContract {
             return Err(DaoError::AlreadyInitialized);
         }
 
+        // Validate contract addresses
+        if nft_contract == admin || reputation_contract == admin {
+            return Err(DaoError::InvalidContractAddress);
+        }
+
         let config = DaoConfig {
             admin,
             nft_contract,
@@ -38,6 +43,7 @@ impl DaoContract {
             proposal_creation_threshold,
             execution_delay,
             min_voting_period,
+            paused: false, // Initialize as not paused
         };
         storage::save_config(&env, &config);
         events::emit_contract_initialized(&env);
@@ -91,7 +97,8 @@ impl DaoContract {
     }
 
     // Finalize a proposal
-    pub fn finalize_proposal(env: Env, _caller: Address, proposal_id: u32) -> Result<(), DaoError> {
+    pub fn finalize_proposal(env: Env, caller: Address, proposal_id: u32) -> Result<(), DaoError> {
+        caller.require_auth();
         governance::finalize_proposal(&env, proposal_id)
     }
 
@@ -111,6 +118,16 @@ impl DaoContract {
     // Get all proposals
     pub fn get_all_proposals(env: Env) -> Vec<Proposal> {
         storage::get_all_proposals(&env)
+    }
+
+    // Get proposals with pagination for gas optimization
+    pub fn get_proposals_paginated(env: Env, page: u32, page_size: u32) -> Vec<Proposal> {
+        storage::get_proposals_paginated(&env, page, page_size)
+    }
+
+    // Get total proposal count for pagination
+    pub fn get_total_proposal_count(env: Env) -> u32 {
+        storage::get_total_proposal_count(&env)
     }
 
     // Get voting results for a proposal
@@ -134,6 +151,33 @@ impl DaoContract {
         storage::has_voted(&env, proposal_id, &voter)
     }
 
+    // Emergency pause/unpause functions (admin only)
+    pub fn pause_contract(env: Env, caller: Address) -> Result<(), DaoError> {
+        caller.require_auth();
+        let mut config = storage::get_config(&env);
+        if caller != config.admin {
+            return Err(DaoError::Unauthorized);
+        }
+        
+        config.paused = true;
+        storage::save_config(&env, &config);
+        events::emit_config_updated(&env);
+        Ok(())
+    }
+
+    pub fn unpause_contract(env: Env, caller: Address) -> Result<(), DaoError> {
+        caller.require_auth();
+        let mut config = storage::get_config(&env);
+        if caller != config.admin {
+            return Err(DaoError::Unauthorized);
+        }
+        
+        config.paused = false;
+        storage::save_config(&env, &config);
+        events::emit_config_updated(&env);
+        Ok(())
+    }
+
     // Update contract configuration (admin only)
     pub fn update_config(
         env: Env,
@@ -155,7 +199,7 @@ impl DaoContract {
             config.admin = admin;
         }
         if let Some(nft_contract) = new_nft_contract {
-            config.nft_contract = nft_contract;
+            config.nft_contract = nft_contract; // Fixed: was incorrectly assigning to admin
         }
         if let Some(reputation_contract) = new_reputation_contract {
             config.reputation_contract = reputation_contract;

@@ -3,7 +3,6 @@ use soroban_sdk::{symbol_short, Address, Env, Symbol};
 const PROPOSAL_CREATED: Symbol = symbol_short!("PROP_CRT");
 const VOTE_CAST: Symbol = symbol_short!("VOTE_CST");
 const PROPOSAL_STATUS: Symbol = symbol_short!("PROP_STS");
-const PROPOSAL_EXECUTED: Symbol = symbol_short!("PROP_EXE");
 
 pub fn emit_proposal_created(env: &Env, proposal_id: u32, creator: Address) {
     env.events()
@@ -24,7 +23,7 @@ pub fn emit_proposal_finalized(env: &Env, proposal_id: u32, approved: bool) {
 
 /// Emits an event when the DAO configuration is updated
 pub fn emit_config_updated(env: &Env) {
-    env.events().publish((PROPOSAL_EXECUTED,), ()); // No additional data)
+    env.events().publish((symbol_short!("CONFIG"),), ());
 }
 
 // Event for contract initialization

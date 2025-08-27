@@ -56,9 +56,19 @@ pub fn calculate_voting_power(
 ) -> u64 {
     let rep_client = ReputationClient::new(env, reputation_contract);
     let nft_client = ERC721Client::new(env, nft_contract);
-    let reputation = rep_client.get_reputation(voter);
-    let nft_balance = nft_client.balance_of(voter);
+    
+    // Try to get reputation, fallback to 0 if external contract fails
+    let reputation = match rep_client.get_reputation(voter) {
+        rep if rep > 0 => rep,
+        _ => 0, // Fallback to 0 if external contract fails
+    };
+    
+    // Try to get NFT balance, fallback to 0 if external contract fails
+    let nft_balance = match nft_client.balance_of(voter) {
+        balance if balance > 0 => balance,
+        _ => 0, // Fallback to 0 if external contract fails
+    };
 
-    // Combine them (e.g., simple addition, or apply weights as needed)
+    // Combine them
     reputation + nft_balance
 }

@@ -33,6 +33,11 @@ pub enum DaoError {
     AlreadyInitialized = 10,
     ProposalNotPassed = 11,
     ExecutionDelayNotMet = 12,
+    InvalidContractAddress = 13,
+    ContractPaused = 14,
+    ExternalContractError = 15,
+    InvalidTimestamp = 16,
+    VoteLimitExceeded = 17,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -93,4 +98,5 @@ pub struct DaoConfig {
     pub proposal_creation_threshold: u64,
     pub execution_delay: u64,
     pub min_voting_period: u64,
+    pub paused: bool, // Emergency pause flag
 }
