@@ -1,7 +1,7 @@
 use crate::types::*;
 use soroban_sdk::{Address, Env, Vec};
 
-// ✅ Proposal Storage
+// Proposal Storage
 pub fn save_proposal(env: &Env, proposal: &Proposal) {
     env.storage()
         .instance()
@@ -42,8 +42,14 @@ pub fn increment_proposal_count(env: &Env) -> u32 {
     count
 }
 
-// ✅ Vote Storage
+// Vote Storage
 pub fn save_vote(env: &Env, vote: &Vote) {
+    // Save individual vote record
+    env.storage()
+        .instance()
+        .set(&DataKey::Vote(vote.proposal_id, vote.voter.clone()), vote);
+
+    // Also save to proposal votes list
     let mut votes: Vec<Vote> = env
         .storage()
         .instance()
@@ -78,7 +84,7 @@ pub fn get_votes_for_proposal(env: &Env, proposal_id: u32) -> Vec<Vote> {
         .unwrap_or_else(|| Vec::new(env))
 }
 
-// ✅ DAO Config Storage
+// DAO Config Storage
 pub fn save_config(env: &Env, config: &DaoConfig) {
     env.storage().instance().set(&DataKey::Config, config);
 }

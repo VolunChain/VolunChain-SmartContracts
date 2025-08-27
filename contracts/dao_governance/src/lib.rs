@@ -7,7 +7,10 @@ mod governance;
 mod storage;
 mod types;
 
-use types::{DaoConfig, DaoError, Proposal, ProposalType, VoteType};
+#[cfg(test)]
+mod test;
+
+use types::{DaoConfig, DaoError, Proposal, ProposalType, VoteType, DataKey};
 
 #[contract]
 pub struct DaoContract;
@@ -24,7 +27,7 @@ impl DaoContract {
         execution_delay: u64,
         min_voting_period: u64,
     ) -> Result<(), DaoError> {
-        if storage::get_proposal_count(&env) > 0 {
+        if env.storage().instance().has(&DataKey::Config) {
             return Err(DaoError::AlreadyInitialized);
         }
 
