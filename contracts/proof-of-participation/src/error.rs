@@ -12,10 +12,18 @@ pub enum ContractError {
     TaskNameTooLong = 10,
     MetadataTooLong = 11,
     InvalidPaginationArguments = 12, // If offset/limit are problematic
+    TaskIdTooLong = 13,
+    TaskIdEmpty = 14,
+    PaginationLimitExceeded = 15,
+    InvalidTimestamp = 16,
+    OrganizationNameTooLong = 17,
+    OrganizationNameEmpty = 18,
+    InvalidAddress = 19,
 
     // --- Organization Errors ---
     OrganizationAlreadyRegistered = 101,
     OrganizationNotRegistered = 102,
+    TooManyOrganizations = 103,
 
     // --- Participation Errors ---
     ParticipationAlreadyRegistered = 201,

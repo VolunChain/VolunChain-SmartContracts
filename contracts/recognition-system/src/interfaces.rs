@@ -1,5 +1,5 @@
 use crate::datatype::{NFTError, NFTMetadata};
-use soroban_sdk::{Address, Env, String};
+use soroban_sdk::{Address, Env, String, Vec};
 
 #[allow(dead_code)]
 pub trait MetadataOperations {
@@ -61,4 +61,25 @@ pub trait DistributionOperations {
         volunteer:
         Address, org: Address
     ) -> bool;
+}
+
+#[allow(dead_code)]
+pub struct ReputationSystemClient<'a> {
+    env: &'a Env,
+    contract_id: Address,
+}
+
+#[allow(dead_code)]
+impl<'a> ReputationSystemClient<'a> {
+    pub fn new(env: &'a Env, contract_id: Address) -> Self {
+        Self { env, contract_id }
+    }
+
+    pub fn get_organizations(&self) -> Result<Vec<Address>, NFTError> {
+        Ok(Vec::new(self.env))
+    }
+
+    pub fn get_reputation(&self, _volunteer: &Address) -> Result<u32, NFTError> {
+        Ok(0)
+    }
 }

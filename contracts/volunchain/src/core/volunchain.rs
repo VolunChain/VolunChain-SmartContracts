@@ -1,9 +1,11 @@
 use soroban_sdk::{token::TokenClient, Address, Env};
 use crate::{error::ContractError, storage::types::{Bounty, DataKey}};
 
+#[allow(dead_code)]
 pub struct VolunchainManager;
 
 impl VolunchainManager {
+    #[allow(dead_code)]
     pub fn create_bounty(e: Env, bounty_properties: Bounty) -> Result<Bounty, ContractError> {
         e.storage()
             .instance()
@@ -12,6 +14,7 @@ impl VolunchainManager {
         Ok(bounty_properties)
     }
 
+    #[allow(dead_code)]
     pub fn withdraw_reward(e: Env, volunteer: Address, trustline: Address) -> Result<Bounty, ContractError> {
         let bounty_result = Self::get_bounty(e.clone());
         let bounty = match bounty_result {
@@ -45,6 +48,7 @@ impl VolunchainManager {
         Ok(bounty)
     }
 
+    #[allow(dead_code)]
     pub fn get_bounty(e: Env) -> Result<Bounty, ContractError> {
         let bounty = e
             .storage()

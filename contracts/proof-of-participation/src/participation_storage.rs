@@ -5,6 +5,11 @@ use crate::error::ContractError;
 // Define maximum lengths
 pub const MAX_TASK_NAME_LEN: u32 = 64;
 pub const MAX_METADATA_LEN: u32 = 128;
+pub const MAX_TASK_ID_LEN: u32 = 128;
+pub const MAX_PAGINATION_LIMIT: u32 = 100;
+pub const MAX_VOLUNTEERS_PER_TASK: u32 = 1000;
+pub const MAX_PARTICIPATIONS_PER_VOLUNTEER: u32 = 1000;
+pub const MAX_PARTICIPATIONS_PER_ORG: u32 = 10000;
 
 // Participation data structure including optional metadata
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -49,6 +54,12 @@ pub fn store_participation(
     // Update volunteer's participation list (storing keys now)
     let volunteer_list_key = DataKey::VolunteerParticipations(volunteer.clone());
     let mut volunteer_participation_keys: Vec<ParticipationKey> = get_vec_from_persistent_storage(env, &volunteer_list_key);
+    
+    // Check storage limits
+    if volunteer_participation_keys.len() as u32 >= MAX_PARTICIPATIONS_PER_VOLUNTEER {
+        return; // Prevent unbounded growth
+    }
+    
     volunteer_participation_keys.push_back(p_key.clone());
     env.storage().persistent().set(&volunteer_list_key, &volunteer_participation_keys);
     bump_persistent_ttl(env, &volunteer_list_key);
@@ -58,6 +69,10 @@ pub fn store_participation(
     let mut task_volunteers: Vec<Address> = get_vec_from_persistent_storage(env, &task_list_key);
     // Avoid duplicates in task volunteer list
     if !task_volunteers.contains(volunteer) {
+        // Check storage limits
+        if task_volunteers.len() as u32 >= MAX_VOLUNTEERS_PER_TASK {
+            return; // Prevent unbounded growth
+        }
         task_volunteers.push_back(volunteer.clone());
         env.storage().persistent().set(&task_list_key, &task_volunteers);
     }
@@ -66,6 +81,12 @@ pub fn store_participation(
     // Update organization's participation list
     let org_list_key = DataKey::OrgParticipationList(organization.clone());
     let mut org_participation_keys: Vec<ParticipationKey> = get_vec_from_persistent_storage(env, &org_list_key);
+    
+    // Check storage limits
+    if org_participation_keys.len() as u32 >= MAX_PARTICIPATIONS_PER_ORG {
+        return; // Prevent unbounded growth
+    }
+    
     org_participation_keys.push_back(p_key.clone()); // p_key includes volunteer and task_id
     env.storage().persistent().set(&org_list_key, &org_participation_keys);
     bump_persistent_ttl(env, &org_list_key);

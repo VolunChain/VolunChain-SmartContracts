@@ -2,11 +2,13 @@ use soroban_sdk::{Address, Env};
 
 use crate::{error::ContractError, storage::types::DataKey};
 
+#[allow(dead_code)]
 pub fn has_administrator(e: &Env) -> bool {
     let key = DataKey::Admin;
     e.storage().instance().has(&key)
 }
 
+#[allow(dead_code)]
 pub fn read_administrator(e: &Env) -> Result<Address, ContractError> {
     let key = DataKey::Admin;
     e.storage()
@@ -15,6 +17,7 @@ pub fn read_administrator(e: &Env) -> Result<Address, ContractError> {
         .ok_or(ContractError::AdminNotFound) // Added Result type to avoid panic if the return type is none
 }
 
+#[allow(dead_code)]
 pub fn write_administrator(e: &Env, id: &Address) -> Result<(), ContractError> {
     // Added result type to return error if code fails
     let key = DataKey::Admin;

@@ -5,7 +5,7 @@ use crate::events;
 use crate::organization;
 use crate::storage;
 use crate::participation_storage::{
-    self, Participation, MAX_TASK_NAME_LEN, MAX_METADATA_LEN,
+    self, Participation, MAX_TASK_NAME_LEN, MAX_METADATA_LEN, MAX_TASK_ID_LEN, MAX_PAGINATION_LIMIT,
     paginate_vec, get_participations_from_keys
 };
 
@@ -26,6 +26,12 @@ pub fn register_participation(
     if task_name.len() > MAX_TASK_NAME_LEN {
         return Err(ContractError::TaskNameTooLong);
     }
+    if task_id.len() == 0 {
+        return Err(ContractError::TaskIdEmpty);
+    }
+    if task_id.len() > MAX_TASK_ID_LEN {
+        return Err(ContractError::TaskIdTooLong);
+    }
     if let Some(ref m) = metadata {
         if m.len() > MAX_METADATA_LEN {
             return Err(ContractError::MetadataTooLong);
@@ -38,6 +44,13 @@ pub fn register_participation(
     }
 
     let timestamp = env.ledger().timestamp();
+    
+    // Validate timestamp is reasonable
+    let now = env.ledger().timestamp();
+    let max_future_time = now + 24 * 3600; // 24 hours in future
+    if timestamp > max_future_time {
+        return Err(ContractError::InvalidTimestamp);
+    }
 
     // Store using participation storage function
     participation_storage::store_participation(
@@ -82,6 +95,11 @@ pub fn get_volunteer_participations(
     limit: u32,
 ) -> Result<Vec<Participation>, ContractError> {
 
+    // Validate pagination limits
+    if limit > MAX_PAGINATION_LIMIT {
+        return Err(ContractError::PaginationLimitExceeded);
+    }
+
     let participation_keys: Vec<storage::ParticipationKey> = participation_storage::get_volunteer_participation_keys(env, volunteer);
     let paginated_keys = paginate_vec(env, &participation_keys, offset, limit)?;
     let participations = get_participations_from_keys(env, &paginated_keys);
@@ -95,6 +113,11 @@ pub fn get_task_volunteers(
     offset: u32,
     limit: u32,
 ) -> Result<Vec<Address>, ContractError> {
+    // Validate pagination limits
+    if limit > MAX_PAGINATION_LIMIT {
+        return Err(ContractError::PaginationLimitExceeded);
+    }
+
     let volunteers: Vec<Address> = participation_storage::get_task_volunteers_list(env, task_id);
     paginate_vec(env, &volunteers, offset, limit)
 }
@@ -105,6 +128,10 @@ pub fn get_organization_participations(
     offset: u32,
     limit: u32,
 ) -> Result<Vec<Participation>, ContractError> {
+    // Validate pagination limits
+    if limit > MAX_PAGINATION_LIMIT {
+        return Err(ContractError::PaginationLimitExceeded);
+    }
    
     let participation_keys = participation_storage::get_organization_participation_keys(env, organization);
     let paginated_keys = paginate_vec(env, &participation_keys, offset, limit)?;

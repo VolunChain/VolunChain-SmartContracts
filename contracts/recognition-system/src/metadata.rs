@@ -1,5 +1,5 @@
 use crate::{
-    datatype::{NFTError, NFTMetadata, RecognitionNFT},
+    datatype::{NFTError, NFTMetadata, RecognitionNFT, MAX_TITLE_LEN, MAX_DATE_LEN, MAX_TASK_LEN},
     interfaces::MetadataOperations,
     RecognitionSystemContract,
 };
@@ -13,6 +13,23 @@ impl MetadataOperations for RecognitionSystemContract {
         date: String,
         task: String
     ) -> Result<NFTMetadata, NFTError> {
+        // Validate organization address
+        let org_str = organization.to_string();
+        if org_str.len() == 0 {
+            return Err(NFTError::InvalidAddress);
+        }
+        
+        // Validate input lengths
+        if title.len() as u32 > MAX_TITLE_LEN {
+            return Err(NFTError::TitleTooLong);
+        }
+        if date.len() as u32 > MAX_DATE_LEN {
+            return Err(NFTError::DateTooLong);
+        }
+        if task.len() as u32 > MAX_TASK_LEN {
+            return Err(NFTError::TaskTooLong);
+        }
+        
         let metadata = NFTMetadata {
             ev_org: organization,
             ev_title: title,
@@ -33,13 +50,37 @@ impl MetadataOperations for RecognitionSystemContract {
     ) -> Result<(), NFTError> {
         // Check that admin is authorized
         admin.require_auth();
+        
+        // Verify admin is the actual contract admin
+        let contract_admin = env.storage().instance().get(&crate::datatype::DataKeys::Admin)
+            .ok_or(NFTError::UnauthorizedOwner)?;
+        if admin != contract_admin {
+            return Err(NFTError::UnauthorizedOwner);
+        }
+
+        // Validate organization address
+        let org_str = organization.to_string();
+        if org_str.len() == 0 {
+            return Err(NFTError::InvalidAddress);
+        }
+        
+        // Validate input lengths
+        if title.len() as u32 > MAX_TITLE_LEN {
+            return Err(NFTError::TitleTooLong);
+        }
+        if date.len() as u32 > MAX_DATE_LEN {
+            return Err(NFTError::DateTooLong);
+        }
+        if task.len() as u32 > MAX_TASK_LEN {
+            return Err(NFTError::TaskTooLong);
+        }
 
         // Get the existing NFT
         let mut nft: RecognitionNFT = env
             .storage()
             .persistent()
             .get(&token_id)
-            .ok_or(NFTError::IDInvalid)?;
+            .ok_or(NFTError::BadgeNotFound)?;
 
         // Assign updated event fields
         nft.metadata.ev_title = title;
